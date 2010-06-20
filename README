@@ -23,23 +23,23 @@ usage: perl sorttv.pl dir-to-sort dir-to-sort-to [non-episode-dir [xbmcwebserver
 ---
 Install
 
-You need to install Perl and then save sorttv.pl whereever. Eg: on Linux into /home/[yourusername]/sorttv/
+You need to install Perl and then save sorttv.pl where ever. Eg: on Linux into /home/[yourusername]/sorttv/
 
 If you want to make it sort new episodes every hour:
 
 On Linux: 
-  in a colsole type: crontab -e
+  in a console type: crontab -e
   on a new line enter "5 * * * * " followed by the command to run the script.
   This will run the script 5 mins past every hour.
   Eg:
   5 * * * * nice perl /home/cliffe/sorttv/sorttv.pl /home/cliffe/Downloads/ /home/cliffe/TV /home/cliffe/Non-episodes localhost:8089 >> /home/cliffe/sorttv/sorttv.log
 
-  Every hour this would sort new episodes from a download directory into a sorted TV directory (if show/season sub-directories dont exist they are created), 
+  Every hour this would sort new episodes from a download directory into a sorted TV directory (if show/season sub-directories don't exist they are created), 
   moving files that are not TV episodes into a separate directory. If new episodes are moved then xbmc pops up a message informing of the new episodes and updates its library.
   For xbmc integration make sure the TV directory is setup (see the xbmc docs). Information logged to a log file.
 
 On Windows:
-  Create a .bat file with the command and use schedular.
+  Create a .bat file with the command and use scheduler.
   Google is your friend. 
 
 ---
