@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 
 # 2010 Z. Cliffe Schreuders
-# free software: GPL v2 or later
+# free software: GPL v3 or later
 # 
 # sorts tv shows into tvshow/series directories
 # if the dirs don't exist they are created
