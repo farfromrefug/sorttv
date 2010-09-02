@@ -4,6 +4,8 @@ Automatically sorts TV show episodes into an organised directory structure. Can 
 
 dir structure:[show]/[season x]/[eps]
 
+Sorts and moves episodes and complete season directories.
+
 Tested on Linux and Windows
 
 ---
@@ -53,3 +55,4 @@ Enjoy!
 
 Paypal donations welcome:
 http://schreuders.org
+If you feel like this script saves you hours of manual sorting then consider making a $5 paypal donation :)
