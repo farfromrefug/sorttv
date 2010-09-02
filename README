@@ -44,6 +44,10 @@ On Windows:
   Create a .bat file with the command and use scheduler.
   Google is your friend. 
 
+You may need to install the modules the script uses.
+To do so, run this command on Linux:
+sudo cpan File::Copy::Recursive File::Glob LWP::Simple
+On Windows run the same command, without "sudo'
 ---
 Enjoy!
 
