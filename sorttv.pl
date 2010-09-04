@@ -35,7 +35,7 @@ display_info();
 FILE: foreach my $file (bsd_glob($sortdir.'*')) {
 	$showname = "";
 	# Regex for tv show season directory
-	if(-d $file && $file =~ /.*\/(.*)(?:Season|Series)\D([1-9]+).*/i && $1) {
+	if(-d $file && $file =~ /.*\/(.*)(?:Season|Series)\D(\d+).*/i && $1) {
 		$pureshowname = $1;
 		$showname = fixtitle($pureshowname);
 		$series = $2;
@@ -43,12 +43,12 @@ FILE: foreach my $file (bsd_glob($sortdir.'*')) {
 			redo FILE;
 		}
 	# Regex for tv show episode: S01E01 or 1x1 or 1 x 1 etc
-	} elsif($file =~ /.*\/(.*)(?:\.|\s)[Ss]0*([1-9]+)[Ee]0*([1-9]+).*/
-	  || $file =~ /.*\/(.*)(?:\.|\s)0*([1-9]+)x0*([1-9]+).*/
-	  || $file =~ /.*\/(.*)(?:\.|\s)0*([1-9]+)\D*0*([1-9]+).*/) {
+	} elsif($file =~ /.*\/(.*)(?:\.|\s)[Ss]0*(\d+)[Ee]0*(\d+).*/
+	  || $file =~ /.*\/(.*)(?:\.|\s)0*(\d+)x0*(\d+).*/
+	  || $file =~ /.*\/(.*)(?:\.|\s)0*(\d+)\D*0*(\d+).*/) {
 		$pureshowname = $1;
 		$showname = fixtitle($pureshowname);
-		$series = $2;
+		$series = sprintf("%02d",$2);
 		$episode = $3;
 		if($showname ne "") {
 			if(move_episode($pureshowname, $showname, $series, $episode, $file) == $redofile) {
@@ -105,7 +105,7 @@ sub fixtitle {
 sub fixtitle2 {
 	my ($title) = @_;
 	$title = fixtitle($title);
-	$title =~ s/\d|\s//ig;
+	$title =~ s/\d|\s|\(|\)//ig;
 	return $title;
 }
 
@@ -115,6 +115,7 @@ sub remdot {
 	$title =~ s/\./ /ig;
 	$title =~ s/_/ /ig;
 	$title =~ s/-//ig;
+	$title =~ s/'//ig;
 	# don't end on whitespace
 	$title =~ s/\s$//ig;
 	return $title;
@@ -146,7 +147,7 @@ sub move_episode {
 			my $s = $show.'/*';
 			my @g=bsd_glob($show);
 			foreach my $season (bsd_glob($show.'/*')) {
-				if(-d $season.'/' && $season =~ /(?:Season|Series)?\s?0*(\d)$/i && $1 == $series) {
+				if(-d $season.'/' && $season =~ /(?:Season|Series)?\s?0*(\d+)$/i && $1 == $series) {
 					print "found a matching season:\n\t$season\n";
 					print "moving $file to ", $season . '/' . filename($file), "\n";
 					if(-d $file) {
