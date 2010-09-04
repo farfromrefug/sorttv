@@ -19,9 +19,9 @@ use LWP::Simple;
 use warnings;
 use strict;
 
-(@ARGV >= 2 && @ARGV <= 4) || die "usage: script.pl dir-to-sort dir-to-sort-to [non-episode-dir [xbmcwebserverhostname:port]]\n";
+(@ARGV >= 2 && @ARGV <= 5) || die "usage: script.pl dir-to-sort dir-to-sort-to [non-episode-dir [xbmcwebserverhostname:port [--conservative]]]\n";
 
-my ($sortdir, $tvdir, $nonepisodedir, $xbmcwebserver) = @ARGV;
+my ($sortdir, $tvdir, $nonepisodedir, $xbmcwebserver, $flag) = @ARGV;
 my ($showname, $series, $episode, $pureshowname) = "";
 my ($newshows, $new);
 my $redofile = 1;
@@ -48,7 +48,7 @@ FILE: foreach my $file (bsd_glob($sortdir.'*')) {
 	# Regex for tv show episode: S01E01 or 1x1 or 1 x 1 etc
 	} elsif($file =~ /.*\/(.*)(?:\.|\s)[Ss]0*(\d+)[Ee]0*(\d+).*/
 	  || $file =~ /.*\/(.*)(?:\.|\s)0*(\d+)x0*(\d+).*/
-	  || $file =~ /.*\/(.*)(?:\.|\s)0*(\d+)\D*0*(\d+).*/) {
+	  || ($flag ne "--conservative" && $file =~ /.*\/(.*)(?:\.|\s)0*(\d+)\D*0*(\d+).*/)) {
 		$pureshowname = $1;
 		$showname = fixtitle($pureshowname);
 		$series = sprintf("%02d",$2);
