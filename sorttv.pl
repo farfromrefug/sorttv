@@ -7,6 +7,9 @@
 # if the dirs don't exist they are created
 # updates xbmc via the web interface
 # unsorted files are moved to a dir if specifed
+#
+# other contributers:
+# salithus - xbmc forum
 
 
 use File::Copy::Recursive "dirmove";
