@@ -38,7 +38,7 @@ display_info();
 FILE: foreach my $file (bsd_glob($sortdir.'*')) {
 	$showname = "";
 	# Regex for tv show season directory
-	if(-d $file && $file =~ /.*\/(.*)(?:Season|Series)\D(\d+).*/i && $1) {
+	if(-d $file && $file =~ /.*\/(.*)(?:Season|Series)\D0*(\d+).*/i && $1) {
 		$pureshowname = $1;
 		$showname = fixtitle($pureshowname);
 		$series = $2;
