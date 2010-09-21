@@ -21,10 +21,14 @@ use strict;
 
 (@ARGV >= 2 && @ARGV <= 5) || die "usage: script.pl dir-to-sort dir-to-sort-to [non-episode-dir [xbmcwebserverhostname:port [--conservative]]]\n";
 
-my ($sortdir, $tvdir, $nonepisodedir, $xbmcwebserver, $flag) = @ARGV;
+my ($sortdir, $tvdir, $nonepisodedir, $xbmcwebserver, $matchtype);
 my ($showname, $series, $episode, $pureshowname) = "";
 my ($newshows, $new);
-my $redofile = 1;
+my $REDO_FILE = my $moveseasons = "TRUE";
+my $usedots = my $rename = 0;
+
+process_args(@ARGV);
+
 if($nonepisodedir) {
 	$nonepisodedir .= '/' if($nonepisodedir !~ /\/$/);
 }
@@ -42,19 +46,19 @@ FILE: foreach my $file (bsd_glob($sortdir.'*')) {
 		$pureshowname = $1;
 		$showname = fixtitle($pureshowname);
 		$series = $2;
-		if(move_series($pureshowname, $showname, $series, $file) == $redofile) {
+		if(move_series($pureshowname, $showname, $series, $file) eq $REDO_FILE) {
 			redo FILE;
 		}
 	# Regex for tv show episode: S01E01 or 1x1 or 1 x 1 etc
 	} elsif($file =~ /.*\/(.*)(?:\.|\s)[Ss]0*(\d+)[Ee]0*(\d+).*/
 	  || $file =~ /.*\/(.*)(?:\.|\s)0*(\d+)x0*(\d+).*/
-	  || ($flag ne "--conservative" && $file =~ /.*\/(.*)(?:\.|\s)0*(\d+)\D*0*(\d+).*/)) {
+	  || ($matchtype ne "--conservative" && $file =~ /.*\/(.*)(?:\.|\s)0*(\d+)\D*0*(\d+).*/)) {
 		$pureshowname = $1;
 		$showname = fixtitle($pureshowname);
-		$series = sprintf("%02d",$2);
+		$series = $2;
 		$episode = $3;
 		if($showname ne "") {
-			if(move_episode($pureshowname, $showname, $series, $episode, $file) == $redofile) {
+			if(move_episode($pureshowname, $showname, $series, $episode, $file) eq $REDO_FILE) {
 				redo FILE;
 			}
 		}
@@ -75,6 +79,36 @@ if($xbmcwebserver && $newshows) {
 
 exit;
 
+sub process_args {
+	foreach my $arg (@_) {
+		if($arg =~ /^--non-episode-dir:(.*)/ || $arg =~ /^-ne:(.*)/) {
+			$nonepisodedir = $1;
+		} elsif($arg =~ /^--xbmc-web-server:(.*)/ || $arg =~ /^-xs:(.*)/) {
+			$xbmcwebserver = $1;
+		} elsif($arg =~ /^--match-type:(.*)/ || $arg =~ /^-mt:(.*)/) {
+			$matchtype = $1;
+		} elsif(!defined($sortdir)) {
+			$sortdir = $arg;
+		} elsif(!defined($tvdir)) {
+			$tvdir = $arg;
+		} elsif($arg eq "--help" || $arg eq "-h") {
+			showhelp();
+		} else {
+			warn "Incorrect usage (invalid option)\n";
+			showhelp();
+			exit;
+		}
+	}
+	if(!defined($sortdir)) {
+		warn "Incorrect usage (missing sort directories)\n";
+		showhelp();
+		exit;
+	}
+}
+
+sub showhelp {
+	print "Usage: sorttv [OPTIONS] directory-to-sort directory-to-sort-into\n";
+}
 
 sub displayandupdateinfo {
 	my ($show, $xbmcwebserver) = @_;
@@ -156,7 +190,7 @@ sub move_episode {
 					if(-d $file) {
 						dirmove($file, $season . '/' . filename($file)) or warn "File $show cannot be copied to $season. : $!";
 					} else {
-						move($file, $season . '/' . filename($file)) or warn "File $show cannot be copied to $season. : $!";
+						move($file, $season) or warn "File $show cannot be copied to $season. : $!";
 					}
 					if($xbmcwebserver) {
 						$new = "$showname season $series episode $episode";
@@ -186,7 +220,7 @@ sub move_episode {
 	}
 	# try again now that the dir exists
 	# redo FILE;
-	return $redofile;
+	return $REDO_FILE;
 }
 
 # move a new Season x directory
@@ -226,5 +260,5 @@ sub move_series {
 	}
 	# try again now that the dir exists
 	# redo FILE;
-	return $redofile;
+	return $REDO_FILE;
 }
