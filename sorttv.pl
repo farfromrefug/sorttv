@@ -19,23 +19,20 @@ use LWP::Simple;
 use warnings;
 use strict;
 
-(@ARGV >= 2 && @ARGV <= 5) || die "usage: script.pl dir-to-sort dir-to-sort-to [non-episode-dir [xbmcwebserverhostname:port [--conservative]]]\n";
-
 my ($sortdir, $tvdir, $nonepisodedir, $xbmcwebserver, $matchtype);
 my ($showname, $series, $episode, $pureshowname) = "";
 my ($newshows, $new);
 my $REDO_FILE = my $moveseasons = "TRUE";
-my $usedots = my $rename = 0;
+my $usedots = my $rename = my $logfile = 0;
 
+print "SortTV\n", "~" x 6,"\n";
+get_config_from_file("sorttv.config");
 process_args(@ARGV);
-
-if($nonepisodedir) {
-	$nonepisodedir .= '/' if($nonepisodedir !~ /\/$/);
+if(!defined($sortdir) || !defined($tvdir)) {
+	warn "Incorrect usage or configuration (missing sort or sort-to directories)\n";
+	showhelp();
+	exit;
 }
-
-# append a trailing / if it's not there
-$sortdir .= '/' if($sortdir !~ /\/$/);
-$tvdir .= '/' if($tvdir !~ /\/$/);
 
 display_info();
 
@@ -83,26 +80,56 @@ sub process_args {
 	foreach my $arg (@_) {
 		if($arg =~ /^--non-episode-dir:(.*)/ || $arg =~ /^-ne:(.*)/) {
 			$nonepisodedir = $1;
+			# append a trailing / if it's not there
+			$nonepisodedir .= '/' if($nonepisodedir !~ /\/$/);
 		} elsif($arg =~ /^--xbmc-web-server:(.*)/ || $arg =~ /^-xs:(.*)/) {
 			$xbmcwebserver = $1;
 		} elsif($arg =~ /^--match-type:(.*)/ || $arg =~ /^-mt:(.*)/) {
 			$matchtype = $1;
-		} elsif(!defined($sortdir)) {
-			$sortdir = $arg;
-		} elsif(!defined($tvdir)) {
-			$tvdir = $arg;
+		} elsif($arg =~ /^--log-file:(.*)/ || $arg =~ /^-o:(.*)/) {
+			$logfile = $1;
+		} elsif($arg =~ /^--directory-to-sort:(.*)/ || $arg =~ /^-sort:(.*)/) {
+			$sortdir = $1;
+			# append a trailing / if it's not there
+			$sortdir .= '/' if($sortdir !~ /\/$/);
+		} elsif($arg =~ /^--directory-to-sort-into:(.*)/ || $arg =~ /^-sortto:(.*)/) {
+			$tvdir = $1;
+			# append a trailing / if it's not there
+			$tvdir .= '/' if($tvdir !~ /\/$/);
 		} elsif($arg eq "--help" || $arg eq "-h") {
 			showhelp();
+		} elsif(!defined($sortdir)) {
+			$sortdir = $arg;
+			# append a trailing / if it's not there
+			$sortdir .= '/' if($sortdir !~ /\/$/);
+		} elsif(!defined($tvdir)) {
+			$tvdir = $arg;
+			# append a trailing / if it's not there
+			$tvdir .= '/' if($tvdir !~ /\/$/);
 		} else {
-			warn "Incorrect usage (invalid option)\n";
+			warn "Incorrect usage (invalid option): $arg\n";
 			showhelp();
-			exit;
 		}
 	}
-	if(!defined($sortdir)) {
-		warn "Incorrect usage (missing sort directories)\n";
-		showhelp();
-		exit;
+}
+
+sub get_config_from_file {
+	my ($filename) = @_;
+	my @arraytoconvert;
+	
+	if(open (IN, $filename)) {
+		print "Reading configuration settings from '$filename'\n";
+		while(my $in = <IN>) {
+			chomp($in);
+			if($in =~ /(.+):(.+)/) {
+				process_args("--$1:$2");
+			} else {
+				warn "WARNING: this line does not match expected format: '$in'\n";
+			}
+		}
+		close (IN);
+	} else {
+		warn "Couldn't open '$filename': $!\n";
 	}
 }
 
