@@ -47,9 +47,9 @@ FILE: foreach my $file (bsd_glob($sortdir.'*')) {
 			redo FILE;
 		}
 	# Regex for tv show episode: S01E01 or 1x1 or 1 x 1 etc
-	} elsif($file =~ /.*\/(.*)(?:\.|\s)[Ss]0*(\d+)[Ee]0*(\d+).*/
-	  || $file =~ /.*\/(.*)(?:\.|\s)0*(\d+)x0*(\d+).*/
-	  || ($matchtype ne "--conservative" && $file =~ /.*\/(.*)(?:\.|\s)0*(\d+)\D*0*(\d+).*/)) {
+	} elsif($file =~ /.*\/(.*)(?:\.|\s)[Ss]0*(\d+)\s*[Ee]0*(\d+).*/
+	|| $file =~ /.*\/(.*)(?:\.|\s)0*(\d+)\s*[xX]\s*0*(\d+).*/
+	  || ($matchtype eq "--liberal" && $file =~ /.*\/(.*)(?:\.|\s)0*(\d+)\D*0*(\d+).*/)) {
 		$pureshowname = $1;
 		$showname = fixtitle($pureshowname);
 		$series = $2;
@@ -88,6 +88,8 @@ sub process_args {
 			$matchtype = $1;
 		} elsif($arg =~ /^--log-file:(.*)/ || $arg =~ /^-o:(.*)/) {
 			$logfile = $1;
+		} elsif($arg =~ /^--read-config-file:(.*)/ || $arg =~ /^-conf:(.*)/) {
+			get_config_from_file($1);
 		} elsif($arg =~ /^--directory-to-sort:(.*)/ || $arg =~ /^-sort:(.*)/) {
 			$sortdir = $1;
 			# append a trailing / if it's not there
@@ -121,7 +123,9 @@ sub get_config_from_file {
 		print "Reading configuration settings from '$filename'\n";
 		while(my $in = <IN>) {
 			chomp($in);
-			if($in =~ /(.+):(.+)/) {
+			if($in =~ /^\s*#/ || $in =~ /^\s*$/) {
+				# ignores comments and whitespace
+			} elsif($in =~ /(.+):(.+)/) {
 				process_args("--$1:$2");
 			} else {
 				warn "WARNING: this line does not match expected format: '$in'\n";
