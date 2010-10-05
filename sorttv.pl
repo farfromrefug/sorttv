@@ -88,6 +88,10 @@ sub process_args {
 			$matchtype = $1;
 		} elsif($arg =~ /^--log-file:(.*)/ || $arg =~ /^-o:(.*)/) {
 			$logfile = $1;
+		} elsif($arg =~ /^--rename-episodes:(.*)/ || $arg =~ /^-rn:(.*)/) {
+			$rename = $1 if $1 eq "TRUE";
+		} elsif($arg =~ /^--use-dots-instead-of-spaces:(.*)/ || $arg =~ /^-dots:(.*)/) {
+			$usedots = $1 if $1 eq "TRUE";
 		} elsif($arg =~ /^--read-config-file:(.*)/ || $arg =~ /^-conf:(.*)/) {
 			get_config_from_file($1);
 		} elsif($arg =~ /^--directory-to-sort:(.*)/ || $arg =~ /^-sort:(.*)/) {
@@ -164,7 +168,7 @@ sub fixtitle {
 
 # 	$title =~ s/\./ /ig;
 # 	$title =~ s/_/ /ig;
-	$title =~ s/,|the//ig;
+	$title =~ s/,|[. ]the[. ]//ig;
 	$title =~ s/(.*\/)(.*)/$2/;
 	return $title;
 }
@@ -217,12 +221,7 @@ sub move_episode {
 			foreach my $season (bsd_glob($show.'/*')) {
 				if(-d $season.'/' && $season =~ /(?:Season|Series)?\s?0*(\d+)$/i && $1 == $series) {
 					print "found a matching season:\n\t$season\n";
-					print "moving $file to ", $season . '/' . filename($file), "\n";
-					if(-d $file) {
-						dirmove($file, $season . '/' . filename($file)) or warn "File $show cannot be copied to $season. : $!";
-					} else {
-						move($file, $season) or warn "File $show cannot be copied to $season. : $!";
-					}
+					move_an_ep($file, $season, $show, $series, $episode);
 					if($xbmcwebserver) {
 						$new = "$showname season $series episode $episode";
 						displayandupdateinfo($new, $xbmcwebserver);
@@ -254,6 +253,37 @@ sub move_episode {
 	return $REDO_FILE;
 }
 
+sub move_an_ep {
+	my($file, $season, $show, $series, $episode) = @_;
+	my $newfilename = filename($file);
+	my $newpath;
+	
+	if($rename) {
+		my $ext;
+		unless(-d $file) {
+			$ext = $file;
+			$ext =~ s/(.*\.)(.*)/\.$2/;
+		}
+		$newfilename = sprintf("%s S%02dE%02d%s", $showname, $series, $episode, $ext);
+	}
+	if($usedots) {
+		$newfilename =~ s/\s/./ig;
+	}
+	$newpath = $season . '/' . $newfilename;
+	print "moving $file to ", $newpath, "\n";
+	if(-d $file) {
+		dirmove($file, $newpath) or warn "File $show cannot be copied to $season. : $!";
+	} else {
+		move($file, $newpath) or warn "File $show cannot be copied to $season. : $!";
+	}
+}
+
+sub move_a_season {
+	my($file, $show, $series) = @_;
+	print "moving directory to: $show/Season $series\n";
+	dirmove($file, "$show/Season $series") or warn "$show cannot be copied to $show/Season $series : $!";
+}
+
 # move a new Season x directory
 sub move_series {
 	my ($pureshowname, $showname, $series, $file) = @_;
@@ -272,8 +302,7 @@ sub move_series {
 				}
 			}
 			# didn't find a matching season, move DIR
-			print "moving directory to: $show/Season $series\n";
-			dirmove($file, "$show/Season $series") or warn "$show cannot be copied to $show/Season $series : $!";
+			move_a_season($file, $show, $series);
 			if($xbmcwebserver) {
 				$new = "$showname Season $series directory";
 				displayandupdateinfo($new, $xbmcwebserver);
