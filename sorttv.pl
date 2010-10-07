@@ -10,6 +10,17 @@
 #
 # other contributers:
 # salithus - xbmc forum
+#
+# Please goto the xbmc forum to discuss SortTV:
+# http://forum.xbmc.org/showthread.php?t=75949
+# 
+# Get the latest version from here:
+# http://sourceforge.net/projects/sorttv/files/
+# 
+# Cliffe's website:
+# http://schreuders.org/
+# 
+# Please consider a $5 donation if you find this program helpful.
 
 
 use File::Copy::Recursive "dirmove";
@@ -162,7 +173,97 @@ sub get_config_from_file {
 }
 
 sub showhelp {
-	out("std", "Usage: sorttv [OPTIONS] directory-to-sort directory-to-sort-into\n");
+	my $heredoc = <<END;
+Usage: sorttv.pl [OPTIONS] [directory-to-sort directory-to-sort-into]
+
+By default SortTV tries to read the configuration from sorttv.conf
+	(an example config file is available online)
+You can overwrite any config options with commandline arguments, which match the format of the config file (except that each argument starts with "--")
+
+OPTIONS:
+--directory-to-sort:dir
+	The new files to sort
+	For example, set this to where completed downloads are stored
+
+--directory-to-sort-into:dir
+	Where to sort episodes into (dir that will contain dirs for each show)
+	This directory will contain the structure (Show)/(Seasons)/(episodes)
+
+--non-episode-dir:dir
+	Where to put things that are not episodes
+	If this is supplied then files and directories that SortTV does not believe are episodes will be moved here
+	If not specified, non-episodes are not moved
+
+--xbmc-web-server:host:port
+	host:port for xbmc webserver, to automatically update library when new episodes arrive
+	Remember to enable the webserver within xbmc, and "set the content" of your TV directory in xbmc.
+	If not specified, xbmc is not updated
+
+--log-file:filepath
+	Log to this file
+	If not specified, output only goes to stdout (the screen)
+
+--verbose:[TRUE|FALSE]
+	Output verbosity. Set to FALSE to suppress messages describing the decision making process.
+	If not specified, TRUE
+
+--read-config-file:filepath
+	Secondary config file, overwrites settings loaded so far
+	If not specified, only the default config file is loaded (sorttv.conf)
+
+--rename-episodes:[TRUE|FALSE]
+	Rename episodes to "show name S01E01.ext" format when moving
+	If not specified, FALSE
+
+--use-dots-instead-of-spaces:[TRUE|FALSE]
+	Renames episodes to replace spaces with dots
+	If not specified, FALSE
+
+--season-title:string
+	Season title
+	Note: if you want a space it needs to be included
+	(eg "Season " -> "Season 1",  "Series "->"Series 1", "Season."->"Season.1")
+	If not specified, "Season "
+
+--season-double-digits:[TRUE|FALSE]
+	Season format padded to double digits (eg "Season 01" rather than "Season 1")
+	If not specified, FALSE
+
+--match-type:[NORMAL|LIBERAL]
+	Match type. 
+	LIBERAL assumes all files are episodes and tries to extract season and episode number any way possible.
+	If not specified, NORMAL
+	
+EXAMPLES:
+The directory-to-sort and directory-to-sort-to can be supplied directly:
+To sort a Downloads directory contents into a TV directory
+	perl sorttv.pl /home/me/Downloads /home/me/Videos/TV
+Alternatively:
+	perl sorttv.pl --directory-to-sort:/home/me/Downloads --directory-to-sort-into:/home/me/Videos/TV
+
+To move non-episode files in a separate directory:
+	perl sorttv.pl --directory-to-sort:/home/me/Downloads --directory-to-sort-into:/home/me/Videos/TV --non-episode-dir:/home/me/Videos/Non-episodes
+
+To integrate with xbmc (notification and automatic library update):
+	perl sorttv.pl --directory-to-sort:/home/me/Downloads --directory-to-sort-into:/home/me/Videos/TV --xbmc-webserver:localhost:8080
+
+And so on...
+
+FURTHER INFORMATION:
+Please goto the xbmc forum to discuss SortTV:
+http://forum.xbmc.org/showthread.php?t=75949
+
+Get the latest version from here:
+http://sourceforge.net/projects/sorttv/files/
+
+Cliffe's website:
+http://schreuders.org/
+
+Please consider a \$5 donation if you find this program helpful.
+
+END
+	out("std", $heredoc);
+	exit;
 }
 
 sub displayandupdateinfo {
