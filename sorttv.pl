@@ -16,24 +16,28 @@ use File::Copy::Recursive "dirmove";
 use File::Copy;
 use File::Glob ':glob';
 use LWP::Simple;
+use FileHandle;
 use warnings;
 use strict;
 
 my ($sortdir, $tvdir, $nonepisodedir, $xbmcwebserver, $matchtype);
 my ($showname, $series, $episode, $pureshowname) = "";
-my ($newshows, $new);
-my $REDO_FILE = my $moveseasons = "TRUE";
+my ($newshows, $new, $log);
+my $REDO_FILE = my $moveseasons = my $verbose = "TRUE";
 my $usedots = my $rename = my $logfile = my $seasondoubledigit = 0;
 my $seasontitle = "Season ";
 
-print "SortTV\n", "~" x 6,"\n";
+
+out("std", "SortTV\n", "~" x 6,"\n");
 get_config_from_file("sorttv.conf");
 process_args(@ARGV);
 if(!defined($sortdir) || !defined($tvdir)) {
-	warn "Incorrect usage or configuration (missing sort or sort-to directories)\n";
+	out("warn", "Incorrect usage or configuration (missing sort or sort-to directories)\n");
 	showhelp();
 	exit;
 }
+
+$log = FileHandle->new("$logfile", "a") or out("warn", "Could not open log file $logfile: $!\n") if $logfile;
 
 display_info();
 
@@ -69,11 +73,11 @@ FILE: foreach my $file (bsd_glob($sortdir.'*')) {
 			}
 		}
 	} elsif(defined $nonepisodedir) {
-		print "moving non-episode $file to $nonepisodedir\n";
+		out("std", "moving non-episode $file to $nonepisodedir\n");
 		if(-d $file) {
-			dirmove($file, $nonepisodedir . filename($file)) or warn "File $file cannot be copied to $nonepisodedir. : $!";
+			dirmove($file, $nonepisodedir . filename($file)) or out("warn", "File $file cannot be copied to $nonepisodedir. : $!");
 		} else {
-			move($file, $nonepisodedir . filename($file)) or warn "File $file cannot be copied to $nonepisodedir. : $!";
+			move($file, $nonepisodedir . filename($file)) or out("warn", "File $file cannot be copied to $nonepisodedir. : $!");
 		}
 	}
 }
@@ -83,6 +87,7 @@ if($xbmcwebserver && $newshows) {
         get "http://$xbmcwebserver/xbmcCmds/xbmcHttp?command=ExecBuiltIn(Notification(,NEW EPISODES NOW AVAILABLE TO WATCH\n$newshows, 7000))";
 }
 
+$log->close if(defined $log);
 exit;
 
 sub process_args {
@@ -105,6 +110,8 @@ sub process_args {
 			$seasontitle = $1;
 		} elsif($arg =~ /^--season-double-digits:(.*)/ || $arg =~ /^-sd:(.*)/) {
 			$seasondoubledigit = $1 if $1 eq "TRUE";
+		} elsif($arg =~ /^--verbose:(.*)/ || $arg =~ /^-v:(.*)/) {
+			$verbose = $1 if $1 eq "TRUE";
 		} elsif($arg =~ /^--read-config-file:(.*)/ || $arg =~ /^-conf:(.*)/) {
 			get_config_from_file($1);
 		} elsif($arg =~ /^--directory-to-sort:(.*)/ || $arg =~ /^-sort:(.*)/) {
@@ -126,7 +133,7 @@ sub process_args {
 			# append a trailing / if it's not there
 			$tvdir .= '/' if($tvdir !~ /\/$/);
 		} else {
-			warn "Incorrect usage (invalid option): $arg\n";
+			out("warn", "Incorrect usage (invalid option): $arg\n");
 			showhelp();
 		}
 	}
@@ -137,7 +144,7 @@ sub get_config_from_file {
 	my @arraytoconvert;
 	
 	if(open (IN, $filename)) {
-		print "Reading configuration settings from '$filename'\n";
+		out("verbose", "Reading configuration settings from '$filename'\n");
 		while(my $in = <IN>) {
 			chomp($in);
 			if($in =~ /^\s*#/ || $in =~ /^\s*$/) {
@@ -145,17 +152,17 @@ sub get_config_from_file {
 			} elsif($in =~ /(.+):(.+)/) {
 				process_args("--$1:$2");
 			} else {
-				warn "WARNING: this line does not match expected format: '$in'\n";
+				out("warn", "WARNING: this line does not match expected format: '$in'\n");
 			}
 		}
 		close (IN);
 	} else {
-		warn "Couldn't open '$filename': $!\n";
+		out("warn", "Couldn't open config file '$filename': $!\n");
 	}
 }
 
 sub showhelp {
-	print "Usage: sorttv [OPTIONS] directory-to-sort directory-to-sort-into\n";
+	out("std", "Usage: sorttv [OPTIONS] directory-to-sort directory-to-sort-into\n");
 }
 
 sub displayandupdateinfo {
@@ -217,23 +224,23 @@ sub display_info {
 	my ($second, $minute, $hour, $dayofmonth, $month, $yearoffset) = localtime();
 	my $year = 1900 + $yearoffset;
 	my $thetime = "$hour:$minute:$second, $dayofmonth-$month-$year";
-	print "\n\n$thetime\n"; 
-	print "Sorting $sortdir into $tvdir\n"; 
+	out("std", "$thetime\n"); 
+	out("std", "Sorting $sortdir into $tvdir\n"); 
 }
 
 sub move_episode {
 	my ($pureshowname, $showname, $series, $episode, $file) = @_;
 
-	print "trying to move $pureshowname season $series episode $episode\n";
+	out("verbose", "trying to move $pureshowname season $series episode $episode\n");
 	SHOW: foreach my $show (bsd_glob($tvdir.'*')) {
 		my $simpleshowname = '^'.fixtitle2($showname).'$';
 		if(fixtitle($show) =~ /$showname/i || fixtitle2($show) =~ /$simpleshowname/i) {
-			print "found a matching show:\n\t$show\n";
+			out("verbose", "found a matching show:\n\t$show\n");
 			my $s = $show.'/*';
 			my @g=bsd_glob($show);
 			foreach my $season (bsd_glob($show.'/*')) {
 				if(-d $season.'/' && $season =~ /(?:Season|Series|$seasontitle)?\s?0*(\d+)$/i && $1 == $series) {
-					print "found a matching season:\n\t$season\n";
+					out("verbose", "found a matching season:\n\t$season\n");
 					move_an_ep($file, $season, $show, $series, $episode);
 					if($xbmcwebserver) {
 						$new = "$showname season $series episode $episode";
@@ -245,9 +252,9 @@ sub move_episode {
 				}
 			}
 			# didn't find a matching season, make DIR
-			print "making directory: $show/$seasontitle$series\n";
+			out("std", "making season directory: $show/$seasontitle$series\n");
 			unless(mkdir("$show/$seasontitle$series", 0777)) {
-				warn "Could not create dir: $!\n";
+				out("warn", "Could not create season dir: $!\n");
 				# next FILE;
 				return 0;
 			}
@@ -255,9 +262,9 @@ sub move_episode {
 		}
 	}
 	# if we are here then we couldn't find a matching show, make DIR
-	print "making directory: " . $tvdir . remdot($pureshowname)."\n";
+	out("std", "making show directory: " . $tvdir . remdot($pureshowname)."\n");
 	unless(mkdir($tvdir . remdot($pureshowname), 0777)) {
-		warn "Could not create dir: $!\n";
+		out("warn", "Could not create show dir: $!\n");
 		# next FILE;
 		return 0;
 	}
@@ -283,34 +290,34 @@ sub move_an_ep {
 		$newfilename =~ s/\s/./ig;
 	}
 	$newpath = $season . '/' . $newfilename;
-	print "moving $file to ", $newpath, "\n";
+	out("std", "moving $file to ", $newpath, "\n");
 	if(-d $file) {
-		dirmove($file, $newpath) or warn "File $show cannot be copied to $season. : $!";
+		dirmove($file, $newpath) or out("warn", "File $show cannot be copied to $season. : $!");
 	} else {
-		move($file, $newpath) or warn "File $show cannot be copied to $season. : $!";
+		move($file, $newpath) or out("warn", "File $show cannot be copied to $season. : $!");
 	}
 }
 
 sub move_a_season {
 	my($file, $show, $series) = @_;
-	print "moving directory to: $show/$seasontitle$series\n";
-	dirmove($file, "$show/$seasontitle$series") or warn "$show cannot be copied to $show/$seasontitle$series: $!";
+	out("verbose", "moving directory to: $show/$seasontitle$series\n");
+	dirmove($file, "$show/$seasontitle$series") or out("warn", "$show cannot be copied to $show/$seasontitle$series: $!");
 }
 
 # move a new Season x directory
 sub move_series {
 	my ($pureshowname, $showname, $series, $file) = @_;
 
-	print "trying to move $pureshowname season $series directory\n";
+	out("verbose", "trying to move $pureshowname season $series directory\n");
 	SHOW: foreach my $show (bsd_glob($tvdir.'*')) {
 		my $simpleshowname = '^'.fixtitle2($showname).'$';
 		if(fixtitle($show) =~ /$showname/i || fixtitle2($show) =~ /$simpleshowname/i) {
-			print "found a matching show:\n\t$show\n";
+			out("verbose", "found a matching show:\n\t$show\n");
 			my $s = $show.'/*';
 			my @g=bsd_glob($show);
 			foreach my $season (bsd_glob($show.'/*')) {
 				if(-d $season.'/' && $season =~ /(?:Season|Series|$seasontitle)?\s?0*(\d)$/i && $1 == $series) {
-					print "Cannot move season directory: found a matching season already existing:\n\t$season\n";
+					out("warn", "Cannot move season directory: found a matching season already existing:\n\t$season\n");
 					return 0;
 				}
 			}
@@ -325,13 +332,27 @@ sub move_series {
 		}
 	}
 	# if we are here then we couldn't find a matching show, make DIR
-	print "making directory: " . $tvdir . remdot($pureshowname)."\n";
+	out("std", "making directory: " . $tvdir . remdot($pureshowname)."\n");
 	unless(mkdir($tvdir . remdot($pureshowname), 0777)) {
-		warn "Could not create dir: $!\n";
+		out("warn", "Could not create show dir: $!\n");
 		# next FILE;
 		return 0;
 	}
 	# try again now that the dir exists
 	# redo FILE;
 	return $REDO_FILE;
+}
+
+sub out {
+	my ($type, @msg) = @_;
+	
+	return if($type eq "verbose" && $verbose ne "TRUE");
+
+	if($type eq "std") {
+		print @msg;
+		print $log @msg if(defined $log);
+	} elsif($type eq "warn") {
+		warn @msg;
+		print $log @msg if(defined $log);
+	}
 }
