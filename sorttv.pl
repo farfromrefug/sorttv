@@ -27,6 +27,8 @@ use File::Copy::Recursive "dirmove";
 use File::Copy;
 use File::Glob ':glob';
 use LWP::Simple;
+use File::Spec::Functions qw(rel2abs);
+use File::Basename;
 use FileHandle;
 use warnings;
 use strict;
@@ -40,7 +42,7 @@ my $seasontitle = "Season ";
 
 
 out("std", "SortTV\n", "~" x 6,"\n");
-get_config_from_file("sorttv.conf");
+get_config_from_file(dirname(rel2abs($0))."/"."sorttv.conf");
 process_args(@ARGV);
 if(!defined($sortdir) || !defined($tvdir)) {
 	out("warn", "Incorrect usage or configuration (missing sort or sort-to directories)\n");
