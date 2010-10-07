@@ -23,10 +23,11 @@ my ($sortdir, $tvdir, $nonepisodedir, $xbmcwebserver, $matchtype);
 my ($showname, $series, $episode, $pureshowname) = "";
 my ($newshows, $new);
 my $REDO_FILE = my $moveseasons = "TRUE";
-my $usedots = my $rename = my $logfile = 0;
+my $usedots = my $rename = my $logfile = my $seasondoubledigit = 0;
+my $seasontitle = "Season ";
 
 print "SortTV\n", "~" x 6,"\n";
-get_config_from_file("sorttv.config");
+get_config_from_file("sorttv.conf");
 process_args(@ARGV);
 if(!defined($sortdir) || !defined($tvdir)) {
 	warn "Incorrect usage or configuration (missing sort or sort-to directories)\n";
@@ -39,20 +40,28 @@ display_info();
 FILE: foreach my $file (bsd_glob($sortdir.'*')) {
 	$showname = "";
 	# Regex for tv show season directory
-	if(-d $file && $file =~ /.*\/(.*)(?:Season|Series)\D0*(\d+).*/i && $1) {
+	if(-d $file && $file =~ /.*\/(.*)(?:Season|Series|$seasontitle)\D?0*(\d+).*/i && $1) {
 		$pureshowname = $1;
+		if($seasondoubledigit eq "TRUE") {
+			$series = sprintf("%02d", $2);
+		} else {
+			$series = $2;
+		}
 		$showname = fixtitle($pureshowname);
-		$series = $2;
 		if(move_series($pureshowname, $showname, $series, $file) eq $REDO_FILE) {
 			redo FILE;
 		}
 	# Regex for tv show episode: S01E01 or 1x1 or 1 x 1 etc
 	} elsif($file =~ /.*\/(.*)(?:\.|\s)[Ss]0*(\d+)\s*[Ee]0*(\d+).*/
 	|| $file =~ /.*\/(.*)(?:\.|\s)0*(\d+)\s*[xX]\s*0*(\d+).*/
-	  || ($matchtype eq "--liberal" && $file =~ /.*\/(.*)(?:\.|\s)0*(\d+)\D*0*(\d+).*/)) {
+	  || ($matchtype eq "LIBERAL" && $file =~ /.*\/(.*)(?:\.|\s)0*(\d+)\D*0*(\d+).*/)) {
 		$pureshowname = $1;
 		$showname = fixtitle($pureshowname);
-		$series = $2;
+		if($seasondoubledigit eq "TRUE") {
+			$series = sprintf("%02d", $2);
+		} else {
+			$series = $2;
+		}
 		$episode = $3;
 		if($showname ne "") {
 			if(move_episode($pureshowname, $showname, $series, $episode, $file) eq $REDO_FILE) {
@@ -92,6 +101,10 @@ sub process_args {
 			$rename = $1 if $1 eq "TRUE";
 		} elsif($arg =~ /^--use-dots-instead-of-spaces:(.*)/ || $arg =~ /^-dots:(.*)/) {
 			$usedots = $1 if $1 eq "TRUE";
+		} elsif($arg =~ /^--season-title:(.*)/ || $arg =~ /^-st:(.*)/) {
+			$seasontitle = $1;
+		} elsif($arg =~ /^--season-double-digits:(.*)/ || $arg =~ /^-sd:(.*)/) {
+			$seasondoubledigit = $1 if $1 eq "TRUE";
 		} elsif($arg =~ /^--read-config-file:(.*)/ || $arg =~ /^-conf:(.*)/) {
 			get_config_from_file($1);
 		} elsif($arg =~ /^--directory-to-sort:(.*)/ || $arg =~ /^-sort:(.*)/) {
@@ -219,7 +232,7 @@ sub move_episode {
 			my $s = $show.'/*';
 			my @g=bsd_glob($show);
 			foreach my $season (bsd_glob($show.'/*')) {
-				if(-d $season.'/' && $season =~ /(?:Season|Series)?\s?0*(\d+)$/i && $1 == $series) {
+				if(-d $season.'/' && $season =~ /(?:Season|Series|$seasontitle)?\s?0*(\d+)$/i && $1 == $series) {
 					print "found a matching season:\n\t$season\n";
 					move_an_ep($file, $season, $show, $series, $episode);
 					if($xbmcwebserver) {
@@ -232,8 +245,8 @@ sub move_episode {
 				}
 			}
 			# didn't find a matching season, make DIR
-			print "making directory: $show/Season $series\n";
-			unless(mkdir("$show/Season $series", 0777)) {
+			print "making directory: $show/$seasontitle$series\n";
+			unless(mkdir("$show/$seasontitle$series", 0777)) {
 				warn "Could not create dir: $!\n";
 				# next FILE;
 				return 0;
@@ -259,7 +272,7 @@ sub move_an_ep {
 	my $newpath;
 	
 	if($rename) {
-		my $ext;
+		my $ext = "";
 		unless(-d $file) {
 			$ext = $file;
 			$ext =~ s/(.*\.)(.*)/\.$2/;
@@ -280,8 +293,8 @@ sub move_an_ep {
 
 sub move_a_season {
 	my($file, $show, $series) = @_;
-	print "moving directory to: $show/Season $series\n";
-	dirmove($file, "$show/Season $series") or warn "$show cannot be copied to $show/Season $series : $!";
+	print "moving directory to: $show/$seasontitle$series\n";
+	dirmove($file, "$show/$seasontitle$series") or warn "$show cannot be copied to $show/$seasontitle$series: $!";
 }
 
 # move a new Season x directory
@@ -296,7 +309,7 @@ sub move_series {
 			my $s = $show.'/*';
 			my @g=bsd_glob($show);
 			foreach my $season (bsd_glob($show.'/*')) {
-				if(-d $season.'/' && $season =~ /(?:Season|Series)?\s?0*(\d)$/i && $1 == $series) {
+				if(-d $season.'/' && $season =~ /(?:Season|Series|$seasontitle)?\s?0*(\d)$/i && $1 == $series) {
 					print "Cannot move season directory: found a matching season already existing:\n\t$season\n";
 					return 0;
 				}
