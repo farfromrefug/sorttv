@@ -23,11 +23,11 @@
 # Please consider a $5 donation if you find this program helpful.
 
 
-use File::Copy::Recursive "dirmove";
+use File::Copy::Recursive "dirmove", "dircopy";
 use File::Copy;
 use File::Glob ':glob';
 use LWP::Simple;
-use File::Spec::Functions qw(rel2abs);
+use File::Spec::Functions "rel2abs";
 use File::Basename;
 use FileHandle;
 use warnings;
@@ -39,6 +39,7 @@ my ($newshows, $new, $log);
 my $REDO_FILE = my $moveseasons = my $verbose = "TRUE";
 my $usedots = my $rename = my $logfile = my $seasondoubledigit = 0;
 my $seasontitle = "Season ";
+my $sortby = "MOVE";
 
 
 out("std", "SortTV\n", "~" x 6,"\n");
@@ -121,6 +122,8 @@ sub process_args {
 			$usedots = $1 if $1 eq "TRUE";
 		} elsif($arg =~ /^--season-title:(.*)/ || $arg =~ /^-st:(.*)/) {
 			$seasontitle = $1;
+		} elsif($arg =~ /^--sort-by:(.*)/ || $arg =~ /^-by:(.*)/) {
+			$sortby = $1;
 		} elsif($arg =~ /^--season-double-digits:(.*)/ || $arg =~ /^-sd:(.*)/) {
 			$seasondoubledigit = $1 if $1 eq "TRUE";
 		} elsif($arg =~ /^--verbose:(.*)/ || $arg =~ /^-v:(.*)/) {
@@ -235,7 +238,11 @@ OPTIONS:
 	Match type. 
 	LIBERAL assumes all files are episodes and tries to extract season and episode number any way possible.
 	If not specified, NORMAL
-	
+
+--sort-by:[MOVE|COPY]
+	Sort by moving or copying the file. If the file already exists because it was already copied it is silently skipped.
+	If not specified, MOVE
+
 EXAMPLES:
 The directory-to-sort and directory-to-sort-to can be supplied directly:
 To sort a Downloads directory contents into a TV directory
@@ -393,18 +400,39 @@ sub move_an_ep {
 		$newfilename =~ s/\s/./ig;
 	}
 	$newpath = $season . '/' . $newfilename;
-	out("std", "moving $file to ", $newpath, "\n");
-	if(-d $file) {
-		dirmove($file, $newpath) or out("warn", "File $show cannot be copied to $season. : $!");
-	} else {
-		move($file, $newpath) or out("warn", "File $show cannot be copied to $season. : $!");
+	if(-e $newpath) {
+		out("warn", "File $newpath already exists, skipping.\n") if $sortby eq "MOVE";
+		return;
+	}
+	out("std", "$sortby: sorting $file to ", $newpath, "\n");
+	if($sortby eq "MOVE") {
+		if(-d $file) {
+			dirmove($file, $newpath) or out("warn", "File $show cannot be moved to $season. : $!");
+		} else {
+			move($file, $newpath) or out("warn", "File $show cannot be moved to $season. : $!");
+		}
+	} elsif($sortby eq "COPY") {
+		if(-d $file) {
+			dircopy($file, $newpath) or out("warn", "File $show cannot be copied to $season. : $!");
+		} else {
+			copy($file, $newpath) or out("warn", "File $show cannot be copied to $season. : $!");
+		}
 	}
 }
 
 sub move_a_season {
 	my($file, $show, $series) = @_;
-	out("verbose", "moving directory to: $show/$seasontitle$series\n");
-	dirmove($file, "$show/$seasontitle$series") or out("warn", "$show cannot be copied to $show/$seasontitle$series: $!");
+	my $newpath = "$show/$seasontitle$series";
+	if(-e $newpath) {
+		out("warn", "File $newpath already exists, skipping.\n") if $sortby eq "MOVE";
+		return;
+	}
+	out("verbose", "$sortby: sorting directory to: $newpath\n");
+	if($sortby eq "MOVE") {
+		dirmove($file, "$newpath") or out("warn", "$show cannot be moved to $show/$seasontitle$series: $!");
+	} elsif($sortby eq "COPY") {
+		dircopy($file, "$newpath") or out("warn", "$show cannot be copied to $show/$seasontitle$series: $!");
+	}
 }
 
 # move a new Season x directory

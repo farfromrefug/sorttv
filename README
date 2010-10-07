@@ -129,6 +129,10 @@ OPTIONS:
 		LIBERAL assumes all files are episodes and tries to extract season and episode number any way possible.
 		If not specified, NORMAL
 
+	--sort-by:[MOVE|COPY]
+		Sort by moving or copying the file. If the file already exists because it was already copied it is silently skipped.
+		If not specified, MOVE
+
 EXAMPLES:
 The directory-to-sort and directory-to-sort-to can be supplied directly:
 To sort a Downloads directory contents into a TV directory
