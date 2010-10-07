@@ -1,12 +1,18 @@
+~~~~~~
 SortTV
-
-Automatically sorts TV show episodes into an organised directory structure. Can optionally move non-episodes into a separate directory. Also optional integration with xbmc (notification and library update).
-
-dir structure:[show]/[season x]/[eps]
+~~~~~~
+Automatically sorts TV show episodes into an organised directory structure. 
+	dir structure:[show]/[season x]/[eps]
 
 Sorts and moves episodes and complete season directories.
 
 Tested on Linux and Windows
+
+- Can optionally move non-episodes into a separate directory. 
+- Also optional integration with xbmc (notification and library update).
+- Can also rename episodes.
+- Many other options (see below).
+
 
 ---
 Copyright 2010 Z. Cliffe Schreuders
@@ -37,11 +43,9 @@ On Linux:
   on a new line enter "5 * * * * " followed by the command to run the script.
   This will run the script 5 mins past every hour.
   Eg:
-  5 * * * * nice perl /home/cliffe/sorttv/sorttv.pl /home/cliffe/Downloads/ /home/cliffe/TV /home/cliffe/Non-episodes localhost:8089 >> /home/cliffe/sorttv/sorttv.log
+  5 * * * * nice perl /home/cliffe/sorttv/sorttv.pl
 
-  Every hour this would sort new episodes from a download directory into a sorted TV directory (if show/season sub-directories don't exist they are created), 
-  moving files that are not TV episodes into a separate directory. If new episodes are moved then xbmc pops up a message informing of the new episodes and updates its library.
-  For xbmc integration make sure the TV directory is setup (see the xbmc docs). Information logged to a log file.
+  Every hour this would sort new episodes according to the configuration in sorttv.conf
 
 On Windows:
   Create a .bat file with the command and use scheduler.
