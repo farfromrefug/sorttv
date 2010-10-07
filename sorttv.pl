@@ -182,7 +182,7 @@ You can overwrite any config options with commandline arguments, which match the
 
 OPTIONS:
 --directory-to-sort:dir
-	The new files to sort
+	A directory containing files to sort
 	For example, set this to where completed downloads are stored
 
 --directory-to-sort-into:dir
@@ -259,7 +259,7 @@ http://sourceforge.net/projects/sorttv/files/
 Cliffe's website:
 http://schreuders.org/
 
-Please consider a \$5 donation if you find this program helpful.
+Please consider a \$5 paypal donation if you find this program helpful.
 
 END
 	out("std", $heredoc);
