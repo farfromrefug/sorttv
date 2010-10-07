@@ -8,11 +8,21 @@ Sorts and moves episodes and complete season directories.
 
 Tested on Linux and Windows
 
+- Optional integration with xbmc (notification and library update).
 - Can optionally move non-episodes into a separate directory. 
-- Also optional integration with xbmc (notification and library update).
 - Can also rename episodes.
 - Many other options (see below).
 
+This provides the magic required to have your home theatre PC (HTPC) keep itself sorted out. 
+You can combine this script with an automatic episode downloader (there are many available*), 
+and this script can sort all of your new episodes, renaming them appropriately if you like.
+Then, if you use xbmc as a front end, it can tell xbmc to display a message to anyone viewing,
+that new episodes are available. It will then tell xbmc to check for the new episodes.
+
+All you will have to do is sit back and enjoy.
+
+* Episodes of many openly licenced shows are available, and episodes can be downloaded using 
+RSS feeds, torrent downloaders, file hosting site downloaders etc.
 
 ---
 Copyright 2010 Z. Cliffe Schreuders
