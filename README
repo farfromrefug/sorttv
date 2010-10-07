@@ -46,6 +46,11 @@ Install
 
 You need to install Perl and then save sorttv.pl where ever. Eg: on Linux into /home/[yourusername]/sorttv/
 
+You may need to install the modules the script uses.
+To do so, run this command on Linux:
+  sudo cpan File::Copy::Recursive File::Glob LWP::Simple
+On Windows run the same command, without "sudo"
+
 If you want to make it sort new episodes every hour:
 
 On Linux: 
@@ -55,16 +60,12 @@ On Linux:
   Eg:
   5 * * * * nice perl /home/cliffe/sorttv/sorttv.pl
 
-  Every hour this would sort new episodes according to the configuration in sorttv.conf
+  Every hour this would sort new episodes according to the configuration in /home/cliffe/sorttv/sorttv.conf
 
 On Windows:
   Create a .bat file with the command and use scheduler.
   Google is your friend. 
 
-You may need to install the modules the script uses.
-To do so, run this command on Linux:
-sudo cpan File::Copy::Recursive File::Glob LWP::Simple
-On Windows run the same command, without "sudo'
 ---
 USAGE:
 
