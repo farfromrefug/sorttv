@@ -99,8 +99,8 @@ OPTIONS:
 		If not specified, output only goes to stdout (the screen)
 
 	--verbose:[TRUE|FALSE]
-		Output verbosity. Set to FALSE to suppress messages describing the decision making process.
-		If not specified, TRUE
+		Output verbosity. Set to TRUE to show messages describing the decision making process.
+		If not specified, FALSE
 
 	--read-config-file:filepath
 		Secondary config file, overwrites settings loaded so far

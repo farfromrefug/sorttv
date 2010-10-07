@@ -36,8 +36,8 @@ use strict;
 my ($sortdir, $tvdir, $nonepisodedir, $xbmcwebserver, $matchtype);
 my ($showname, $series, $episode, $pureshowname) = "";
 my ($newshows, $new, $log);
-my $REDO_FILE = my $moveseasons = my $verbose = "TRUE";
-my $usedots = my $rename = my $logfile = my $seasondoubledigit = 0;
+my $REDO_FILE = my $moveseasons = "TRUE";
+my $usedots = my $rename = my $logfile = my $verbose = my $seasondoubledigit = 0;
 my $seasontitle = "Season ";
 my $sortby = "MOVE";
 
@@ -127,7 +127,7 @@ sub process_args {
 		} elsif($arg =~ /^--season-double-digits:(.*)/ || $arg =~ /^-sd:(.*)/) {
 			$seasondoubledigit = $1 if $1 eq "TRUE";
 		} elsif($arg =~ /^--verbose:(.*)/ || $arg =~ /^-v:(.*)/) {
-			$verbose = $1 if $1 eq "TRUE";
+			$verbose = $1;
 		} elsif($arg =~ /^--read-config-file:(.*)/ || $arg =~ /^-conf:(.*)/) {
 			get_config_from_file($1);
 		} elsif($arg =~ /^--directory-to-sort:(.*)/ || $arg =~ /^-sort:(.*)/) {
@@ -209,8 +209,8 @@ OPTIONS:
 	If not specified, output only goes to stdout (the screen)
 
 --verbose:[TRUE|FALSE]
-	Output verbosity. Set to FALSE to suppress messages describing the decision making process.
-	If not specified, TRUE
+	Output verbosity. Set to TRUE to show messages describing the decision making process.
+	If not specified, FALSE
 
 --read-config-file:filepath
 	Secondary config file, overwrites settings loaded so far
@@ -477,9 +477,11 @@ sub move_series {
 sub out {
 	my ($type, @msg) = @_;
 	
-	return if($type eq "verbose" && $verbose ne "TRUE");
-
-	if($type eq "std") {
+	if($type eq "verbose") {
+		return if $verbose ne "TRUE";
+		print @msg;
+		print $log @msg if(defined $log);
+	}elsif($type eq "std") {
 		print @msg;
 		print $log @msg if(defined $log);
 	} elsif($type eq "warn") {
