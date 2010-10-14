@@ -37,7 +37,7 @@ my ($sortdir, $tvdir, $nonepisodedir, $xbmcwebserver, $matchtype);
 my ($showname, $series, $episode, $pureshowname) = "";
 my ($newshows, $new, $log);
 my $REDO_FILE = my $moveseasons = "TRUE";
-my $usedots = my $rename = my $logfile = my $verbose = my $seasondoubledigit = 0;
+my $usedots = my $rename = my $logfile = my $verbose = my $seasondoubledigit = my $removesymlinks = 0;
 my $seasontitle = "Season ";
 my $sortby = "MOVE";
 
@@ -58,7 +58,13 @@ display_info();
 FILE: foreach my $file (bsd_glob($sortdir.'*')) {
 	$showname = "";
 	# Regex for tv show season directory
-	if(-d $file && $file =~ /.*\/(.*)(?:Season|Series|$seasontitle)\D?0*(\d+).*/i && $1) {
+	if(-l $file) {
+		if($removesymlinks eq "TRUE") {
+			out("std", "Removing symlink: $file\n");
+			unlink($file) or out("warn", "Could not delete symlink $file: $!\n");
+		}
+		# otherwise file is a symlink, ignore
+	} elsif(-d $file && $file =~ /.*\/(.*)(?:Season|Series|$seasontitle)\D?0*(\d+).*/i && $1) {
 		$pureshowname = $1;
 		if($seasondoubledigit eq "TRUE") {
 			$series = sprintf("%02d", $2);
@@ -118,6 +124,8 @@ sub process_args {
 			$logfile = $1;
 		} elsif($arg =~ /^--rename-episodes:(.*)/ || $arg =~ /^-rn:(.*)/) {
 			$rename = $1 if $1 eq "TRUE";
+		} elsif($arg =~ /^--remove-symlinks:(.*)/ || $arg =~ /^-rs:(.*)/) {
+			$removesymlinks = $1 if $1 eq "TRUE";
 		} elsif($arg =~ /^--use-dots-instead-of-spaces:(.*)/ || $arg =~ /^-dots:(.*)/) {
 			$usedots = $1 if $1 eq "TRUE";
 		} elsif($arg =~ /^--season-title:(.*)/ || $arg =~ /^-st:(.*)/) {
@@ -239,10 +247,19 @@ OPTIONS:
 	LIBERAL assumes all files are episodes and tries to extract season and episode number any way possible.
 	If not specified, NORMAL
 
---sort-by:[MOVE|COPY]
+--sort-by:[MOVE|COPY|MOVE-AND-LEAVE-SYMLINK-BEHIND]
 	Sort by moving or copying the file. If the file already exists because it was already copied it is silently skipped.
+	The MOVE-AND-LEAVE-SYMLINK-BEHIND option may be handy if you want to continue to seed after sorting, this leaves a symlink in place of the newly moved file.
 	If not specified, MOVE
 
+--remove-symlinks:[TRUE|FALSE]
+	Deletes symlinks from the directory to sort while sorting.
+	This may be helpful if you want to remove all the symlinks you previously left behind using --sort-by:MOVE-AND-LEAVE-SYMLINK-BEHIND
+	You could schedule "perl sorttv.pl --remove-symlinks:TRUE" to remove these once a week/month
+	If this option is enabled and used at the same time as --sort-by:MOVE-AND-LEAVE-SYMLINK-BEHIND, 
+	 then only the previous links will be removed, and new ones may also be created
+	If not specified, FALSE
+	
 EXAMPLES:
 The directory-to-sort and directory-to-sort-to can be supplied directly:
 To sort a Downloads directory contents into a TV directory
@@ -401,7 +418,7 @@ sub move_an_ep {
 		return;
 	}
 	out("std", "$sortby: sorting $file to ", $newpath, "\n");
-	if($sortby eq "MOVE") {
+	if($sortby eq "MOVE" || $sortby eq "MOVE-AND-LEAVE-SYMLINK-BEHIND") {
 		if(-d $file) {
 			dirmove($file, $newpath) or out("warn", "File $show cannot be moved to $season. : $!");
 		} else {
@@ -413,6 +430,10 @@ sub move_an_ep {
 		} else {
 			copy($file, $newpath) or out("warn", "File $show cannot be copied to $season. : $!");
 		}
+	}
+	# have moved now link
+	if($sortby eq "MOVE-AND-LEAVE-SYMLINK-BEHIND") {
+		symlink($newpath, $file) or out("warn", "File $newpath cannot be symlinked to $file. : $!");
 	}
 }
 

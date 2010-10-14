@@ -129,9 +129,18 @@ OPTIONS:
 		LIBERAL assumes all files are episodes and tries to extract season and episode number any way possible.
 		If not specified, NORMAL
 
-	--sort-by:[MOVE|COPY]
+	--sort-by:[MOVE|COPY|MOVE-AND-LEAVE-SYMLINK-BEHIND]
 		Sort by moving or copying the file. If the file already exists because it was already copied it is silently skipped.
+		The MOVE-AND-LEAVE-SYMLINK-BEHIND option may be handy if you want to continue to seed after sorting, this leaves a symlink in place of the newly moved file.
 		If not specified, MOVE
+
+	--remove-symlinks:[TRUE|FALSE]
+		Deletes symlinks from the directory to sort while sorting.
+		This may be helpful if you want to remove all the symlinks you previously left behind using --sort-by:MOVE-AND-LEAVE-SYMLINK-BEHIND
+		You could schedule "perl sorttv.pl --remove-symlinks:TRUE" to remove these once a week/month
+		If this option is enabled and used at the same time as --sort-by:MOVE-AND-LEAVE-SYMLINK-BEHIND, 
+		 then only the previous links will be removed, and new ones may also be created
+		If not specified, FALSE
 
 EXAMPLES:
 The directory-to-sort and directory-to-sort-to can be supplied directly:
