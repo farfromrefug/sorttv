@@ -47,7 +47,7 @@ get_config_from_file(dirname(rel2abs($0))."/"."sorttv.conf");
 process_args(@ARGV);
 if(!defined($sortdir) || !defined($tvdir)) {
 	out("warn", "Incorrect usage or configuration (missing sort or sort-to directories)\n");
-	showhelp();
+	out("warn", "run 'perl sorttv.pl --help' for more information about how to use SortTV");
 	exit;
 }
 
@@ -113,9 +113,13 @@ exit;
 sub process_args {
 	foreach my $arg (@_) {
 		if($arg =~ /^--non-episode-dir:(.*)/ || $arg =~ /^-ne:(.*)/) {
-			$nonepisodedir = $1;
-			# append a trailing / if it's not there
-			$nonepisodedir .= '/' if($nonepisodedir !~ /\/$/);
+			if(-e $1) {
+				$nonepisodedir = $1;
+				# append a trailing / if it's not there
+				$nonepisodedir .= '/' if($nonepisodedir !~ /\/$/);
+			} else {
+				out("warn", "Non-episode directory does not exist ($1)\n");
+			}
 		} elsif($arg =~ /^--xbmc-web-server:(.*)/ || $arg =~ /^-xs:(.*)/) {
 			$xbmcwebserver = $1;
 		} elsif($arg =~ /^--match-type:(.*)/ || $arg =~ /^-mt:(.*)/) {
@@ -139,26 +143,42 @@ sub process_args {
 		} elsif($arg =~ /^--read-config-file:(.*)/ || $arg =~ /^-conf:(.*)/) {
 			get_config_from_file($1);
 		} elsif($arg =~ /^--directory-to-sort:(.*)/ || $arg =~ /^-sort:(.*)/) {
-			$sortdir = $1;
-			# append a trailing / if it's not there
-			$sortdir .= '/' if($sortdir !~ /\/$/);
+			if(-e $1) {
+				$sortdir = $1;
+				# append a trailing / if it's not there
+				$sortdir .= '/' if($sortdir !~ /\/$/);
+			} else {
+				out("warn", "Directory to sort does not exist ($1)\n");
+			}
 		} elsif($arg =~ /^--directory-to-sort-into:(.*)/ || $arg =~ /^-sortto:(.*)/) {
-			$tvdir = $1;
-			# append a trailing / if it's not there
-			$tvdir .= '/' if($tvdir !~ /\/$/);
+			if(-e $1) {
+				$tvdir = $1;
+				# append a trailing / if it's not there
+				$tvdir .= '/' if($tvdir !~ /\/$/);
+			} else {
+				out("warn", "Directory to sort into does not exist ($1)\n");
+			}
 		} elsif($arg eq "--help" || $arg eq "-h") {
 			showhelp();
 		} elsif(!defined($sortdir)) {
-			$sortdir = $arg;
-			# append a trailing / if it's not there
-			$sortdir .= '/' if($sortdir !~ /\/$/);
+			if(-e $arg) {
+				$sortdir = $arg;
+				# append a trailing / if it's not there
+				$sortdir .= '/' if($sortdir !~ /\/$/);
+			} else {
+				out("warn", "Directory to sort does not exist ($arg)\n");
+			}
 		} elsif(!defined($tvdir)) {
-			$tvdir = $arg;
-			# append a trailing / if it's not there
-			$tvdir .= '/' if($tvdir !~ /\/$/);
+			if(-e $arg) {
+				$tvdir = $arg;
+				# append a trailing / if it's not there
+				$tvdir .= '/' if($tvdir !~ /\/$/);
+			} else {
+				out("warn", "Directory to sort into does not exist ($arg)\n");
+			}
 		} else {
 			out("warn", "Incorrect usage (invalid option): $arg\n");
-			showhelp();
+			out("warn", "run 'perl sorttv.pl --help' for more information about how to use SortTV");
 		}
 	}
 }
@@ -182,6 +202,7 @@ sub get_config_from_file {
 		close (IN);
 	} else {
 		out("warn", "Couldn't open config file '$filename': $!\n");
+		out("warn", "An example config file is available online and can make using SortTV easier\n");
 	}
 }
 
