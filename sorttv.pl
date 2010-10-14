@@ -281,10 +281,6 @@ sub displayandupdateinfo {
 	# update xbmc video library
 	get "http://$xbmcwebserver/xbmcCmds/xbmcHttp?command=ExecBuiltIn(updatelibrary(video))";
 
-	# save images etc with media
-	# exportlibrary(music|video,true,thumbs,overwrite,actorthumbs)
-	get "http://$xbmcwebserver/xbmcCmds/xbmcHttp?command=ExecBuiltIn(exportlibrary(video,true,true,false,true))";
-
 	# pop up a notification on xbmc
 	# xbmc.executebuiltin('XBMC.Notification(New content found, ' + filename + ', 2000)')
 	get "http://$xbmcwebserver/xbmcCmds/xbmcHttp?command=ExecBuiltIn(Notification(NEW EPISODE, $show, 7000))";
