@@ -330,9 +330,7 @@ sub fixtitle {
 	my ($title) = @_;
 	$title = remdot($title);
 
-# 	$title =~ s/\./ /ig;
-# 	$title =~ s/_/ /ig;
-	$title =~ s/,|[. ]the[. ]//ig;
+	$title =~ s/,|.the.|\bthe\b//ig;
 	$title =~ s/(.*\/)(.*)/$2/;
 	return $title;
 }
@@ -428,7 +426,7 @@ sub move_an_ep {
 			$ext = $file;
 			$ext =~ s/(.*\.)(.*)/\.$2/;
 		}
-		$newfilename = sprintf("%s S%02dE%02d%s", $showname, $series, $episode, $ext);
+		$newfilename = sprintf("%s S%02dE%02d%s", remdot($pureshowname), $series, $episode, $ext);
 	}
 	if($usedots) {
 		$newfilename =~ s/\s/./ig;
