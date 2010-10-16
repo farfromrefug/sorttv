@@ -433,7 +433,7 @@ sub move_an_ep {
 	}
 	$newpath = $season . '/' . $newfilename;
 	if(-e $newpath) {
-		out("warn", "File $newpath already exists, skipping.\n") if $sortby eq "MOVE";
+		out("warn", "File $newpath already exists, skipping.\n") unless $sortby eq "COPY";
 		return;
 	}
 	out("std", "$sortby: sorting $file to ", $newpath, "\n");
