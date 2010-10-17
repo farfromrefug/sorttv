@@ -11,6 +11,7 @@ Tested on Linux and Windows
 - Optional integration with xbmc (notification and library update).
 - Can optionally move non-episodes into a separate directory. 
 - Can also rename episodes.
+- Options for renaming including fetching episode names from thetvdb.com
 - Sort by move, copy, or symlink.
 - Many other options (see below).
 
@@ -115,6 +116,13 @@ OPTIONS:
 	--rename-episodes:[TRUE|FALSE]
 		Rename episodes to "show name S01E01.ext" format when moving
 		If not specified, FALSE
+
+	--rename-format:[SIMPLE|INCLUDE-EPISODE-TITLE]
+		If renaming, should it add the episode name from thetvdb.com?
+		SIMPLE -> "show name S01E01.ext"
+		INCLUDE-EPISODE-TITLE -> "show name S01E01 - episode title.ext"
+		SIMPLE is much faster, since INCLUDE-EPISODE-TITLE involves network requests
+		If not specified, SIMPLE
 
 	--use-dots-instead-of-spaces:[TRUE|FALSE]
 		Renames episodes to replace spaces with dots

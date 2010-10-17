@@ -30,6 +30,7 @@ use File::Glob ':glob';
 use LWP::Simple;
 use File::Spec::Functions "rel2abs";
 use File::Basename;
+use TVDB::API;
 use FileHandle;
 use warnings;
 use strict;
@@ -41,7 +42,7 @@ my $REDO_FILE = my $moveseasons = "TRUE";
 my $usedots = my $rename = my $logfile = my $verbose = my $seasondoubledigit = my $removesymlinks = 0;
 my $seasontitle = "Season ";
 my $sortby = "MOVE";
-
+my $renameformat = "SIMPLE";
 
 out("std", "SortTV\n", "~" x 6,"\n");
 get_config_from_file(dirname(rel2abs($0))."/"."sorttv.conf");
@@ -50,6 +51,14 @@ if(!defined($sortdir) || !defined($tvdir)) {
 	out("warn", "Incorrect usage or configuration (missing sort or sort-to directories)\n");
 	out("warn", "run 'perl sorttv.pl --help' for more information about how to use SortTV");
 	exit;
+}
+
+my $TVDBAPIKEY = "FDDBDB916D936956";
+my $tvdb = TVDB::API::new($TVDBAPIKEY);
+if($renameformat eq "INCLUDE-EPISODE-TITLE") {
+	my $hashref = $tvdb->getAvailableMirrors();
+	$tvdb->setMirrors($hashref);
+	$tvdb->chooseMirrors();
 }
 
 $log = FileHandle->new("$logfile", "a") or out("warn", "Could not open log file $logfile: $!\n") if $logfile;
@@ -129,6 +138,8 @@ sub process_args {
 			$logfile = $1;
 		} elsif($arg =~ /^--rename-episodes:(.*)/ || $arg =~ /^-rn:(.*)/) {
 			$rename = $1 if $1 eq "TRUE";
+		} elsif($arg =~ /^--rename-format:(.*)/ || $arg =~ /^-rf:(.*)/) {
+			$renameformat = $1;
 		} elsif($arg =~ /^--remove-symlinks:(.*)/ || $arg =~ /^-rs:(.*)/) {
 			$removesymlinks = $1 if $1 eq "TRUE";
 		} elsif($arg =~ /^--use-dots-instead-of-spaces:(.*)/ || $arg =~ /^-dots:(.*)/) {
@@ -250,6 +261,13 @@ OPTIONS:
 	Rename episodes to "show name S01E01.ext" format when moving
 	If not specified, FALSE
 
+--rename-format:[SIMPLE|INCLUDE-EPISODE-TITLE]
+	If renaming, should it add the episode name from thetvdb.com?
+	SIMPLE -> "show name S01E01.ext"
+	INCLUDE-EPISODE-TITLE -> "show name S01E01 - episode title.ext"
+	SIMPLE is much faster, since INCLUDE-EPISODE-TITLE involves network requests
+	If not specified, SIMPLE
+
 --use-dots-instead-of-spaces:[TRUE|FALSE]
 	Renames episodes to replace spaces with dots
 	If not specified, FALSE
@@ -327,21 +345,14 @@ sub displayandupdateinfo {
 }
 
 # replaces ".", "_" and removes "the" and ","
+# removes numbers and spaces
 # removes the dir path
 sub fixtitle {
 	my ($title) = @_;
-	$title = remdot($title);
-
-	$title =~ s/,|.the.|\bthe\b//ig;
+	$title =~ s/,|\.the\.|\bthe\b//ig;
 	$title =~ s/(.*\/)(.*)/$2/;
-	return $title;
-}
-
-# removes numbers and spaces
-sub fixtitle2 {
-	my ($title) = @_;
-	$title = fixtitle($title);
 	$title =~ s/\d|\s|\(|\)//ig;
+	$title = remdot($title);
 	return $title;
 }
 
@@ -352,8 +363,9 @@ sub remdot {
 	$title =~ s/_/ /ig;
 	$title =~ s/-//ig;
 	$title =~ s/'//ig;
-	# don't end on whitespace
+	# don't start or end on whitespace
 	$title =~ s/\s$//ig;
+	$title =~ s/^\s//ig;
 	return $title;
 }
 
@@ -377,8 +389,7 @@ sub move_episode {
 
 	out("verbose", "trying to move $pureshowname season $series episode $episode\n");
 	SHOW: foreach my $show (bsd_glob($tvdir.'*')) {
-		my $simpleshowname = '^'.fixtitle2($showname).'$';
-		if(fixtitle($show) =~ /^$showname$/i || fixtitle2($show) =~ /$simpleshowname/i) {
+		if(fixtitle($show) =~ /^$showname$/i) {
 			out("verbose", "found a matching show:\n\t$show\n");
 			my $s = $show.'/*';
 			my @g=bsd_glob($show);
@@ -423,16 +434,26 @@ sub move_an_ep {
 	my $newpath;
 	
 	if($rename) {
-		my $ext = "";
+		my $ext = my $title = "";
 		unless(-d $file) {
 			$ext = $file;
 			$ext =~ s/(.*\.)(.*)/\.$2/;
 		}
-		$newfilename = sprintf("%s S%02dE%02d%s", remdot($pureshowname), $series, $episode, $ext);
+		if($renameformat eq "INCLUDE-EPISODE-TITLE") {
+			out("verbose", "Fetching episode name for ", remdot($pureshowname), " Season $series Episode $episode.\n");
+			my $name = $tvdb->getEpisodeName(remdot($pureshowname), $series, $episode);
+			if($name) {
+				$title = " - $name";
+			} else {
+				out("warn", "Could not get episode name for ", remdot($pureshowname), " Season $series Episode $episode.\n");
+			}
+		}
+		$newfilename = sprintf("%s S%02dE%02d%s%s", remdot($pureshowname), $series, $episode, $title, $ext);
 	}
 	if($usedots) {
 		$newfilename =~ s/\s/./ig;
 	}
+
 	$newpath = $season . '/' . $newfilename;
 	if(-e $newpath) {
 		out("warn", "File $newpath already exists, skipping.\n") unless($sortby eq "COPY" || $sortby eq "PLACE-SYMLINK");
@@ -486,8 +507,7 @@ sub move_series {
 
 	out("verbose", "trying to move $pureshowname season $series directory\n");
 	SHOW: foreach my $show (bsd_glob($tvdir.'*')) {
-		my $simpleshowname = '^'.fixtitle2($showname).'$';
-		if(fixtitle($show) =~ /$showname/i || fixtitle2($show) =~ /$simpleshowname/i) {
+		if(fixtitle($show) =~ /^$showname$/i) {
 			out("verbose", "found a matching show:\n\t$show\n");
 			my $s = $show.'/*';
 			my @g=bsd_glob($show);
