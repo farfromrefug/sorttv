@@ -11,13 +11,14 @@ Tested on Linux and Windows
 - Optional integration with xbmc (notification and library update).
 - Can optionally move non-episodes into a separate directory. 
 - Can also rename episodes.
+- Sort by move, copy, or symlink.
 - Many other options (see below).
 
 This provides the magic required to have your home theatre PC (HTPC) keep itself sorted out. 
 You can combine this script with an automatic episode downloader (there are many available*), 
 and this script can sort all of your new episodes, renaming them appropriately if you like.
-Then, if you use xbmc as a front end, it can tell xbmc to display a message to anyone viewing,
-that new episodes are available. It will then tell xbmc to check for the new episodes.
+Then, if you use xbmc as a front end, it can tell xbmc to check for the new episodes and 
+display a message to anyone viewing, that new episodes are available.
 
 All you will have to do is sit back and enjoy.
 
