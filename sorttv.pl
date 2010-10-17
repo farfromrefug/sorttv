@@ -378,7 +378,7 @@ sub move_episode {
 	out("verbose", "trying to move $pureshowname season $series episode $episode\n");
 	SHOW: foreach my $show (bsd_glob($tvdir.'*')) {
 		my $simpleshowname = '^'.fixtitle2($showname).'$';
-		if(fixtitle($show) =~ /$showname/i || fixtitle2($show) =~ /$simpleshowname/i) {
+		if(fixtitle($show) =~ /^$showname$/i || fixtitle2($show) =~ /$simpleshowname/i) {
 			out("verbose", "found a matching show:\n\t$show\n");
 			my $s = $show.'/*';
 			my @g=bsd_glob($show);
