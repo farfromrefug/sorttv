@@ -46,13 +46,13 @@ This program is free software: you can redistribute it and/or modify
 ---
 Install
 
-You need to install Perl and then save sorttv.pl where ever. Eg: on Linux into /home/[yourusername]/sorttv/
+You need to install Perl and then save sorttv.pl wherever. Eg: on Linux into /home/[yourusername]/sorttv/
 
 Edit the sorttv.conf file to the settings you want (at minimum specify the location of the directories to sort from and to)
 
 You may need to install the modules the script uses.
 To do so, run this command on Linux:
-  sudo cpan File::Copy::Recursive File::Glob LWP::Simple
+sudo cpan File::Copy::Recursive File::Glob LWP::Simple TVDB::API
 On Windows run the same command, without "sudo"
 
 If you want to make it sort new episodes every hour:
