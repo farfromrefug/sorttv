@@ -10,6 +10,7 @@
 #
 # other contributers:
 # salithus - xbmc forum
+# schmoko - xbmc forum
 #
 # Please goto the xbmc forum to discuss SortTV:
 # http://forum.xbmc.org/showthread.php?t=75949
@@ -268,9 +269,10 @@ OPTIONS:
 	LIBERAL assumes all files are episodes and tries to extract season and episode number any way possible.
 	If not specified, NORMAL
 
---sort-by:[MOVE|COPY|MOVE-AND-LEAVE-SYMLINK-BEHIND]
+--sort-by:[MOVE|COPY|MOVE-AND-LEAVE-SYMLINK-BEHIND|LEAVE-AND-PLACE-SYMLINK]
 	Sort by moving or copying the file. If the file already exists because it was already copied it is silently skipped.
 	The MOVE-AND-LEAVE-SYMLINK-BEHIND option may be handy if you want to continue to seed after sorting, this leaves a symlink in place of the newly moved file.
+	PLACE-SYMLINK does not move the original file, but places a symlink in the sort-to directory (probably not what you want)
 	If not specified, MOVE
 
 --remove-symlinks:[TRUE|FALSE]
@@ -433,7 +435,7 @@ sub move_an_ep {
 	}
 	$newpath = $season . '/' . $newfilename;
 	if(-e $newpath) {
-		out("warn", "File $newpath already exists, skipping.\n") unless $sortby eq "COPY";
+		out("warn", "File $newpath already exists, skipping.\n") unless($sortby eq "COPY" || $sortby eq "PLACE-SYMLINK");
 		return;
 	}
 	out("std", "$sortby: sorting $file to ", $newpath, "\n");
@@ -449,6 +451,8 @@ sub move_an_ep {
 		} else {
 			copy($file, $newpath) or out("warn", "File $show cannot be copied to $season. : $!");
 		}
+	} elsif($sortby eq "PLACE-SYMLINK") {
+		symlink($file, $newpath) or out("warn", "File $file cannot be symlinked to $newpath. : $!");
 	}
 	# have moved now link
 	if($sortby eq "MOVE-AND-LEAVE-SYMLINK-BEHIND") {
@@ -460,14 +464,19 @@ sub move_a_season {
 	my($file, $show, $series) = @_;
 	my $newpath = "$show/$seasontitle$series";
 	if(-e $newpath) {
-		out("warn", "File $newpath already exists, skipping.\n") if $sortby eq "MOVE";
+		out("warn", "File $newpath already exists, skipping.\n") unless($sortby eq "COPY" || $sortby eq "PLACE-SYMLINK");
 		return;
 	}
 	out("verbose", "$sortby: sorting directory to: $newpath\n");
-	if($sortby eq "MOVE") {
+	if($sortby eq "MOVE" || $sortby eq "MOVE-AND-LEAVE-SYMLINK-BEHIND") {
 		dirmove($file, "$newpath") or out("warn", "$show cannot be moved to $show/$seasontitle$series: $!");
 	} elsif($sortby eq "COPY") {
 		dircopy($file, "$newpath") or out("warn", "$show cannot be copied to $show/$seasontitle$series: $!");
+	} elsif($sortby eq "PLACE-SYMLINK") {
+		symlink($file, $newpath) or out("warn", "File $file cannot be symlinked to $newpath. : $!");
+	}
+	if($sortby eq "MOVE-AND-LEAVE-SYMLINK-BEHIND") {
+		symlink($newpath, $file) or out("warn", "File $newpath cannot be symlinked to $file. : $!");
 	}
 }
 

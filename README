@@ -46,6 +46,9 @@ Install
 
 You need to install Perl and then save sorttv.pl where ever. Eg: on Linux into /home/[yourusername]/sorttv/
 
+Recommended: Save the example sorttv.conf into the same directory
+	Edit it to the settings you want (at minimum specify the location of the directories to sort from and to)
+
 You may need to install the modules the script uses.
 To do so, run this command on Linux:
   sudo cpan File::Copy::Recursive File::Glob LWP::Simple
@@ -73,6 +76,9 @@ sorttv.pl [OPTIONS] [directory-to-sort directory-to-sort-into]
 
 By default SortTV tries to read the configuration from sorttv.conf
 	(an example config file is available online)
+
+The simplest way to use SortTV is to edit the example config file, then just run "perl sorttv.pl" to do the sorting
+
 You can overwrite any config options with commandline arguments, which match the format of the config file (except that each argument starts with "--")
 
 OPTIONS:
@@ -129,9 +135,10 @@ OPTIONS:
 		LIBERAL assumes all files are episodes and tries to extract season and episode number any way possible.
 		If not specified, NORMAL
 
-	--sort-by:[MOVE|COPY|MOVE-AND-LEAVE-SYMLINK-BEHIND]
+	--sort-by:[MOVE|COPY|MOVE-AND-LEAVE-SYMLINK-BEHIND|PLACE-SYMLINK]
 		Sort by moving or copying the file. If the file already exists because it was already copied it is silently skipped.
 		The MOVE-AND-LEAVE-SYMLINK-BEHIND option may be handy if you want to continue to seed after sorting, this leaves a symlink in place of the newly moved file.
+		PLACE-SYMLINK does not move the original file, but places a symlink in the sort-to directory (probably not what you want).
 		If not specified, MOVE
 
 	--remove-symlinks:[TRUE|FALSE]
