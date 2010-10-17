@@ -47,8 +47,7 @@ Install
 
 You need to install Perl and then save sorttv.pl where ever. Eg: on Linux into /home/[yourusername]/sorttv/
 
-Recommended: Save the example sorttv.conf into the same directory
-	Edit it to the settings you want (at minimum specify the location of the directories to sort from and to)
+Edit the sorttv.conf file to the settings you want (at minimum specify the location of the directories to sort from and to)
 
 You may need to install the modules the script uses.
 To do so, run this command on Linux:
