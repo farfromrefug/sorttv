@@ -351,8 +351,8 @@ sub fixtitle {
 	my ($title) = @_;
 	$title =~ s/,|\.the\.|\bthe\b//ig;
 	$title =~ s/(.*\/)(.*)/$2/;
-	$title =~ s/\d|\s|\(|\)//ig;
 	$title = remdot($title);
+	$title =~ s/\d|\s|\(|\)//ig;
 	return $title;
 }
 
