@@ -157,7 +157,14 @@ OPTIONS:
 		 then only the previous links will be removed, and new ones may also be created
 		If not specified, FALSE
 
+	--show-name-substitute:NAME1-->NAME2
+		Substitutes files equal to NAME1 for NAME2
+		This argument can be repeated to add multiple rules for substitution
+
 EXAMPLES:
+Does a sort, as configured in sorttv.conf:
+	perl sorttv.pl
+
 The directory-to-sort and directory-to-sort-to can be supplied directly:
 To sort a Downloads directory contents into a TV directory
 	perl sorttv.pl /home/me/Downloads /home/me/Videos/TV

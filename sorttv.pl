@@ -135,7 +135,7 @@ sub process_args {
 			$xbmcwebserver = $1;
 		} elsif($arg =~ /^--match-type:(.*)/ || $arg =~ /^-mt:(.*)/) {
 			$matchtype = $1;
-		} elsif($arg =~ /^--show-name-change:(.*-->.*)/ || $arg =~ /^-nc:(.*-->.*)/) {
+		} elsif($arg =~ /^--show-name-substitute:(.*-->.*)/ || $arg =~ /^-sub:(.*-->.*)/) {
 			push @showrenames, $1;
 		} elsif($arg =~ /^--log-file:(.*)/ || $arg =~ /^-o:(.*)/) {
 			$logfile = $1;
@@ -303,8 +303,16 @@ OPTIONS:
 	If this option is enabled and used at the same time as --sort-by:MOVE-AND-LEAVE-SYMLINK-BEHIND, 
 	 then only the previous links will be removed, and new ones may also be created
 	If not specified, FALSE
-	
+
+--show-name-substitute:NAME1-->NAME2
+	Substitutes files equal to NAME1 for NAME2
+	This argument can be repeated to add multiple rules for substitution
+
+
 EXAMPLES:
+Does a sort, as configured in sorttv.conf:
+	perl sorttv.pl
+
 The directory-to-sort and directory-to-sort-to can be supplied directly:
 To sort a Downloads directory contents into a TV directory
 	perl sorttv.pl /home/me/Downloads /home/me/Videos/TV
