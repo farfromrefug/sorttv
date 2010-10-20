@@ -43,6 +43,7 @@ my $usedots = my $rename = my $logfile = my $verbose = my $seasondoubledigit = m
 my $seasontitle = "Season ";
 my $sortby = "MOVE";
 my $renameformat = "SIMPLE";
+my @showrenames;
 
 out("std", "SortTV\n", "~" x 6,"\n");
 get_config_from_file(dirname(rel2abs($0))."/"."sorttv.conf");
@@ -134,6 +135,8 @@ sub process_args {
 			$xbmcwebserver = $1;
 		} elsif($arg =~ /^--match-type:(.*)/ || $arg =~ /^-mt:(.*)/) {
 			$matchtype = $1;
+		} elsif($arg =~ /^--show-name-change:(.*-->.*)/ || $arg =~ /^-nc:(.*-->.*)/) {
+			push @showrenames, $1;
 		} elsif($arg =~ /^--log-file:(.*)/ || $arg =~ /^-o:(.*)/) {
 			$logfile = $1;
 		} elsif($arg =~ /^--rename-episodes:(.*)/ || $arg =~ /^-rn:(.*)/) {
@@ -349,11 +352,26 @@ sub displayandupdateinfo {
 # removes the dir path
 sub fixtitle {
 	my ($title) = @_;
+	$title = substitute_name($title);
 	$title =~ s/,|\.the\.|\bthe\b//ig;
 	$title =~ s/(.*\/)(.*)/$2/;
 	$title = remdot($title);
 	$title =~ s/\d|\s|\(|\)//ig;
 	return $title;
+}
+
+# substitutes show names as configured
+sub substitute_name {
+	my ($from) = @_;
+	foreach my $substitute (@showrenames) {
+		if($substitute =~ /(.*)-->(.*)/) {
+			if($from eq $1) {
+				return $2;
+			}
+		}
+	}
+	# if no matches, returns unchanged
+	return $from;
 }
 
 # removes dots and underscores for creating dirs
@@ -417,8 +435,8 @@ sub move_episode {
 		}
 	}
 	# if we are here then we couldn't find a matching show, make DIR
-	out("std", "making show directory: " . $tvdir . remdot($pureshowname)."\n");
-	unless(mkdir($tvdir . remdot($pureshowname), 0777)) {
+	out("std", "making show directory: " . $tvdir . substitute_name(remdot($pureshowname))."\n");
+	unless(mkdir($tvdir . substitute_name(remdot($pureshowname)), 0777)) {
 		out("warn", "Could not create show dir: $!\n");
 		# next FILE;
 		return 0;
@@ -440,15 +458,15 @@ sub move_an_ep {
 			$ext =~ s/(.*\.)(.*)/\.$2/;
 		}
 		if($renameformat eq "INCLUDE-EPISODE-TITLE") {
-			out("verbose", "Fetching episode name for ", remdot($pureshowname), " Season $series Episode $episode.\n");
-			my $name = $tvdb->getEpisodeName(remdot($pureshowname), $series, $episode);
+			out("verbose", "Fetching episode name for ", substitute_name(remdot($pureshowname)), " Season $series Episode $episode.\n");
+			my $name = $tvdb->getEpisodeName(substitute_name(remdot($pureshowname)), $series, $episode);
 			if($name) {
 				$title = " - $name";
 			} else {
-				out("warn", "Could not get episode name for ", remdot($pureshowname), " Season $series Episode $episode.\n");
+				out("warn", "Could not get episode name for ", substitute_name(remdot($pureshowname)), " Season $series Episode $episode.\n");
 			}
 		}
-		$newfilename = sprintf("%s S%02dE%02d%s%s", remdot($pureshowname), $series, $episode, $title, $ext);
+		$newfilename = sprintf("%s S%02dE%02d%s%s", substitute_name(remdot($pureshowname)), $series, $episode, $title, $ext);
 	}
 	if($usedots) {
 		$newfilename =~ s/\s/./ig;
@@ -528,8 +546,8 @@ sub move_series {
 		}
 	}
 	# if we are here then we couldn't find a matching show, make DIR
-	out("std", "making directory: " . $tvdir . remdot($pureshowname)."\n");
-	unless(mkdir($tvdir . remdot($pureshowname), 0777)) {
+	out("std", "making directory: " . $tvdir . substitute_name(remdot($pureshowname))."\n");
+	unless(mkdir($tvdir . substitute_name(remdot($pureshowname)), 0777)) {
 		out("warn", "Could not create show dir: $!\n");
 		# next FILE;
 		return 0;
