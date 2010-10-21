@@ -42,7 +42,7 @@ my $REDO_FILE = my $moveseasons = "TRUE";
 my $usedots = my $rename = my $logfile = my $verbose = my $seasondoubledigit = my $removesymlinks = 0;
 my $seasontitle = "Season ";
 my $sortby = "MOVE";
-my $renameformat = "SIMPLE";
+my $renameformat = "[SHOW_NAME] - [EP1][EP_NAME1]";
 my @showrenames;
 
 out("std", "SortTV\n", "~" x 6,"\n");
@@ -56,7 +56,7 @@ if(!defined($sortdir) || !defined($tvdir)) {
 
 my $TVDBAPIKEY = "FDDBDB916D936956";
 my $tvdb = TVDB::API::new($TVDBAPIKEY);
-if($renameformat eq "INCLUDE-EPISODE-TITLE") {
+if($renameformat =~ /\[EP_NAME\d]/i) {
 	my $hashref = $tvdb->getAvailableMirrors();
 	$tvdb->setMirrors($hashref);
 	$tvdb->chooseMirrors();
@@ -264,13 +264,23 @@ OPTIONS:
 	Rename episodes to "show name S01E01.ext" format when moving
 	If not specified, FALSE
 
---rename-format:[SIMPLE|INCLUDE-EPISODE-TITLE]
-	If renaming, should it add the episode name from thetvdb.com?
-	SIMPLE -> "show name S01E01.ext"
-	INCLUDE-EPISODE-TITLE -> "show name S01E01 - episode title.ext"
-	SIMPLE is much faster, since INCLUDE-EPISODE-TITLE involves network requests
-	If not specified, SIMPLE
-
+--rename-format:{formatstring}
+	the format to use if renaming to a new format (as specified above)
+	Hint: including the Episode Title as part of the name slows the process down a bit since titles are retrieved from thetvdb.com
+	The formatstring can be made up of:
+	[SHOW_NAME]: "My Show"
+	[EP1]: "S01E01"
+	[EP2]: "1x1"
+	[EP3]: "1x01"
+	[EP_NAME1] " - Episode Title"
+	[EP_NAME2] ".Episode Title"
+	If not specified the format is "[SHOW_NAME] - [EP1][EP_NAME1]"
+	For example:
+		for "My Show S01E01 - Episode Title" (this is the default)
+		--rename-format:[SHOW_NAME] - [EP1][EP_NAME1]
+		for "My Show.S01E01.Episode Title"
+		--rename-format:[SHOW_NAME].[EP1][EP_NAME2]
+		
 --use-dots-instead-of-spaces:[TRUE|FALSE]
 	Renames episodes to replace spaces with dots
 	If not specified, FALSE
@@ -462,21 +472,33 @@ sub move_an_ep {
 	my $newpath;
 	
 	if($rename) {
-		my $ext = my $title = "";
+		my $ext = my $eptitle = "";
 		unless(-d $file) {
 			$ext = $file;
 			$ext =~ s/(.*\.)(.*)/\.$2/;
 		}
-		if($renameformat eq "INCLUDE-EPISODE-TITLE") {
+		if($renameformat =~ /\[EP_NAME(\d)]/i) {
 			out("verbose", "Fetching episode name for ", substitute_name(remdot($pureshowname)), " Season $series Episode $episode.\n");
 			my $name = $tvdb->getEpisodeName(substitute_name(remdot($pureshowname)), $series, $episode);
 			if($name) {
-				$title = " - $name";
+				$eptitle = " - $name" if $1 == 1;
+				$eptitle = ".$name" if $1 == 2;
 			} else {
 				out("warn", "Could not get episode name for ", substitute_name(remdot($pureshowname)), " Season $series Episode $episode.\n");
 			}
 		}
-		$newfilename = sprintf("%s S%02dE%02d%s%s", substitute_name(remdot($pureshowname)), $series, $episode, $title, $ext);
+		my $sname = substitute_name(remdot($pureshowname));
+		my $ep1 = sprintf("S%02dE%02d", $series, $episode);
+		my $ep2 = sprintf("%dx%d", $series, $episode);
+		my $ep3 = sprintf("%dx%02d", $series, $episode);
+		# create the new file name
+		$newfilename = $renameformat;
+		$newfilename =~ s/\[SHOW_NAME]/$sname/ig;
+		$newfilename =~ s/\[EP1]/$ep1/ig;
+		$newfilename =~ s/\[EP2]/$ep2/ig;
+		$newfilename =~ s/\[EP3]/$ep3/ig;
+		$newfilename =~ s/\[EP_NAME\d]/$eptitle/ig;
+		$newfilename .= $ext;
 	}
 	if($usedots) {
 		$newfilename =~ s/\s/./ig;

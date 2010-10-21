@@ -11,7 +11,7 @@ Tested on Linux and Windows
 - Optional integration with xbmc (notification and library update).
 - Can optionally move non-episodes into a separate directory. 
 - Can also rename episodes.
-- Options for renaming including fetching episode names from thetvdb.com
+- Options for renaming, including custom naming formats and fetching episode names from thetvdb.com.
 - Sort by move, copy, or symlink.
 - Many other options (see below).
 
@@ -117,12 +117,22 @@ OPTIONS:
 		Rename episodes to "show name S01E01.ext" format when moving
 		If not specified, FALSE
 
-	--rename-format:[SIMPLE|INCLUDE-EPISODE-TITLE]
-		If renaming, should it add the episode name from thetvdb.com?
-		SIMPLE -> "show name S01E01.ext"
-		INCLUDE-EPISODE-TITLE -> "show name S01E01 - episode title.ext"
-		SIMPLE is much faster, since INCLUDE-EPISODE-TITLE involves network requests
-		If not specified, SIMPLE
+	--rename-format:{formatstring}
+		the format to use if renaming to a new format (as specified above)
+		Hint: including the Episode Title as part of the name slows the process down a bit since titles are retrieved from thetvdb.com
+		The formatstring can be made up of:
+			[SHOW_NAME]: "My Show"
+			[EP1]: "S01E01"
+			[EP2]: "1x1"
+			[EP3]: "1x01"
+			[EP_NAME1] " - Episode Title"
+			[EP_NAME2] ".Episode Title"
+		If not specified the format is, "[SHOW_NAME] - [EP1][EP_NAME1]"
+		For example:
+			for "My Show S01E01 - Episode Title" (this is the default)
+			--rename-format:[SHOW_NAME] - [EP1][EP_NAME1]
+			for "My Show.S01E01.Episode Title"
+			--rename-format:[SHOW_NAME].[EP1][EP_NAME2]
 
 	--use-dots-instead-of-spaces:[TRUE|FALSE]
 		Renames episodes to replace spaces with dots
