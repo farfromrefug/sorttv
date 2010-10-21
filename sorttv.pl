@@ -31,6 +31,7 @@ use LWP::Simple;
 use File::Spec::Functions "rel2abs";
 use File::Basename;
 use TVDB::API;
+use File::Find;
 use FileHandle;
 use warnings;
 use strict;
@@ -43,6 +44,7 @@ my $usedots = my $rename = my $logfile = my $verbose = my $seasondoubledigit = m
 my $seasontitle = "Season ";
 my $sortby = "MOVE";
 my $renameformat = "[SHOW_NAME] - [EP1][EP_NAME1]";
+my $treatdir = "RECURSIVELY_SORT_CONTENTS";
 my @showrenames;
 
 out("std", "SortTV\n", "~" x 6,"\n");
@@ -66,52 +68,7 @@ $log = FileHandle->new("$logfile", "a") or out("warn", "Could not open log file 
 
 display_info();
 
-FILE: foreach my $file (bsd_glob($sortdir.'*')) {
-	$showname = "";
-	# Regex for tv show season directory
-	if(-l $file) {
-		if($removesymlinks eq "TRUE") {
-			out("std", "Removing symlink: $file\n");
-			unlink($file) or out("warn", "Could not delete symlink $file: $!\n");
-		}
-		# otherwise file is a symlink, ignore
-	} elsif(-d $file && $file =~ /.*\/(.*)(?:Season|Series|$seasontitle)\D?0*(\d+).*/i && $1) {
-		$pureshowname = $1;
-		if($seasondoubledigit eq "TRUE") {
-			$series = sprintf("%02d", $2);
-		} else {
-			$series = $2;
-		}
-		$showname = fixtitle($pureshowname);
-		if(move_series($pureshowname, $showname, $series, $file) eq $REDO_FILE) {
-			redo FILE;
-		}
-	# Regex for tv show episode: S01E01 or 1x1 or 1 x 1 etc
-	} elsif($file =~ /.*\/(.*)(?:\.|\s)[Ss]0*(\d+)\s*[Ee]0*(\d+).*/
-	|| $file =~ /.*\/(.*)(?:\.|\s)0*(\d+)\s*[xX]\s*0*(\d+).*/
-	  || ($matchtype eq "LIBERAL" && $file =~ /.*\/(.*)(?:\.|\s)0*(\d+)\D*0*(\d+).*/)) {
-		$pureshowname = $1;
-		$showname = fixtitle($pureshowname);
-		if($seasondoubledigit eq "TRUE") {
-			$series = sprintf("%02d", $2);
-		} else {
-			$series = $2;
-		}
-		$episode = $3;
-		if($showname ne "") {
-			if(move_episode($pureshowname, $showname, $series, $episode, $file) eq $REDO_FILE) {
-				redo FILE;
-			}
-		}
-	} elsif(defined $nonepisodedir) {
-		out("std", "moving non-episode $file to $nonepisodedir\n");
-		if(-d $file) {
-			dirmove($file, $nonepisodedir . filename($file)) or out("warn", "File $file cannot be copied to $nonepisodedir. : $!");
-		} else {
-			move($file, $nonepisodedir . filename($file)) or out("warn", "File $file cannot be copied to $nonepisodedir. : $!");
-		}
-	}
-}
+sort_directory($sortdir);
 
 if($xbmcwebserver && $newshows) {
 	sleep(4);
@@ -120,6 +77,63 @@ if($xbmcwebserver && $newshows) {
 
 $log->close if(defined $log);
 exit;
+
+sub sort_directory {
+	my ($sortd) = @_;
+	FILE: foreach my $file (bsd_glob($sortd.'*')) {
+		$showname = "";
+		# Regex for tv show season directory
+		if(-l $file) {
+			if($removesymlinks eq "TRUE") {
+				out("std", "Removing symlink: $file\n");
+				unlink($file) or out("warn", "Could not delete symlink $file: $!\n");
+			}
+			# otherwise file is a symlink, ignore
+		} elsif(-d $file && $treatdir eq "IGNORE") {
+			# ignore directories
+		} elsif(-d $file && $treatdir eq "RECURSIVELY_SORT_CONTENTS") {
+			sort_directory("$file/");
+			# removes any empty directories from the to-sort directory and sub-directories
+			finddepth(sub{rmdir},"$sortd");
+		} elsif(-d $file && $file =~ /.*\/(.*)(?:Season|Series|$seasontitle)\D?0*(\d+).*/i && $1) {
+			$pureshowname = $1;
+			if($seasondoubledigit eq "TRUE") {
+				$series = sprintf("%02d", $2);
+			} else {
+				$series = $2;
+			}
+			$showname = fixtitle($pureshowname);
+			if(move_series($pureshowname, $showname, $series, $file) eq $REDO_FILE) {
+				redo FILE;
+			}
+			# Regex for tv show episode: S01E01 or 1x1 or 1 x 1 etc
+		} elsif($file =~ /.*\/(.*)(?:\.|\s)[Ss]0*(\d+)\s*[Ee]0*(\d+).*/
+		|| $file =~ /.*\/(.*)(?:\.|\s)0*(\d+)\s*[xX]\s*0*(\d+).*/
+		|| ($matchtype eq "LIBERAL" && $file =~ /.*\/(.*)(?:\.|\s)0*(\d+)\D*0*(\d+).*/)) {
+			$pureshowname = $1;
+			$showname = fixtitle($pureshowname);
+			if($seasondoubledigit eq "TRUE") {
+				$series = sprintf("%02d", $2);
+			} else {
+				$series = $2;
+			}
+			$episode = $3;
+			if($showname ne "") {
+				if(move_episode($pureshowname, $showname, $series, $episode, $file) eq $REDO_FILE) {
+					redo FILE;
+				}
+			}
+		} elsif(defined $nonepisodedir) {
+			out("std", "MOVING NON-EPISODE $file to $nonepisodedir\n");
+			if(-d $file) {
+				dirmove($file, $nonepisodedir . filename($file)) or out("warn", "File $file cannot be copied to $nonepisodedir. : $!");
+			} else {
+				move($file, $nonepisodedir . filename($file)) or out("warn", "File $file cannot be copied to $nonepisodedir. : $!");
+			}
+		}
+	}
+}
+
 
 sub process_args {
 	foreach my $arg (@_) {
@@ -135,6 +149,8 @@ sub process_args {
 			$xbmcwebserver = $1;
 		} elsif($arg =~ /^--match-type:(.*)/ || $arg =~ /^-mt:(.*)/) {
 			$matchtype = $1;
+		} elsif($arg =~ /^--treat-directories:(.*)/ || $arg =~ /^-td:(.*)/) {
+			$treatdir = $1;
 		} elsif($arg =~ /^--show-name-substitute:(.*-->.*)/ || $arg =~ /^-sub:(.*-->.*)/) {
 			push @showrenames, $1;
 		} elsif($arg =~ /^--log-file:(.*)/ || $arg =~ /^-o:(.*)/) {
@@ -305,6 +321,13 @@ OPTIONS:
 	The MOVE-AND-LEAVE-SYMLINK-BEHIND option may be handy if you want to continue to seed after sorting, this leaves a symlink in place of the newly moved file.
 	PLACE-SYMLINK does not move the original file, but places a symlink in the sort-to directory (probably not what you want)
 	If not specified, MOVE
+
+--treat-directories:[AS_FILES_TO_SORT|RECURSIVELY_SORT_CONTENTS|IGNORE]
+	How to treat directories. 
+	AS_FILES_TO_SORT - sorts directories, moving entire directories that represents an episode, also detects and moves directories of entire seasons
+	RECURSIVELY_SORT_CONTENTS - doesn't move directories, just their contents, including subdirectories
+	AS_FILES_TO_SORT/RECURSIVELY_SORT_CONTENTS/IGNORE
+	If not specified, RECURSIVELY_SORT_CONTENTS
 
 --remove-symlinks:[TRUE|FALSE]
 	Deletes symlinks from the directory to sort while sorting.

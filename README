@@ -159,6 +159,13 @@ OPTIONS:
 		PLACE-SYMLINK does not move the original file, but places a symlink in the sort-to directory (probably not what you want).
 		If not specified, MOVE
 
+	--treat-directories:[AS_FILES_TO_SORT|RECURSIVELY_SORT_CONTENTS|IGNORE]
+		How to treat directories. 
+		AS_FILES_TO_SORT - sorts directories, moving entire directories that represents an episode, also detects and moves directories of entire seasons
+		RECURSIVELY_SORT_CONTENTS - doesn't move directories, just their contents, including subdirectories
+		AS_FILES_TO_SORT/RECURSIVELY_SORT_CONTENTS/IGNORE
+		If not specified, RECURSIVELY_SORT_CONTENTS
+
 	--remove-symlinks:[TRUE|FALSE]
 		Deletes symlinks from the directory to sort while sorting.
 		This may be helpful if you want to remove all the symlinks you previously left behind using --sort-by:MOVE-AND-LEAVE-SYMLINK-BEHIND
