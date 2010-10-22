@@ -437,6 +437,16 @@ sub filename {
 	return $title;
 }
 
+sub escape_myfilename {
+	my ($name) = @_;
+	if($^O =~ /MSWin/) {
+		$name =~ s/[\\\/:*?\"<>|]/-/g;
+	} else {
+		$name =~ s/[\\\/\"<>|]/-/g;
+	}
+	return $name;
+}
+
 sub display_info {
 	my ($second, $minute, $hour, $dayofmonth, $month, $yearoffset) = localtime();
 	my $year = 1900 + $yearoffset;
@@ -469,7 +479,8 @@ sub move_episode {
 			}
 			# didn't find a matching season, make DIR
 			out("std", "making season directory: $show/$seasontitle$series\n");
-			unless(mkdir("$show/$seasontitle$series", 0777)) {
+			my $newpath = "$show/$seasontitle$series";
+			unless(mkdir($newpath, 0777)) {
 				out("warn", "Could not create season dir: $!\n");
 				# next FILE;
 				return 0;
@@ -478,8 +489,8 @@ sub move_episode {
 		}
 	}
 	# if we are here then we couldn't find a matching show, make DIR
-	out("std", "making show directory: " . $tvdir . substitute_name(remdot($pureshowname))."\n");
-	unless(mkdir($tvdir . substitute_name(remdot($pureshowname)), 0777)) {
+	out("std", "making show directory: " . $tvdir . escape_myfilename(substitute_name(remdot($pureshowname)))."\n");
+	unless(mkdir($tvdir . escape_myfilename(substitute_name(remdot($pureshowname))), 0777)) {
 		out("warn", "Could not create show dir: $!\n");
 		# next FILE;
 		return 0;
@@ -522,6 +533,8 @@ sub move_an_ep {
 		$newfilename =~ s/\[EP3]/$ep3/ig;
 		$newfilename =~ s/\[EP_NAME\d]/$eptitle/ig;
 		$newfilename .= $ext;
+		# make sure it is filesystem friendly:
+		$newfilename = escape_myfilename($newfilename, "-");
 	}
 	if($usedots) {
 		$newfilename =~ s/\s/./ig;
@@ -556,7 +569,7 @@ sub move_an_ep {
 
 sub move_a_season {
 	my($file, $show, $series) = @_;
-	my $newpath = "$show/$seasontitle$series";
+	my $newpath = escape_myfilename($show, "-")."/".escape_myfilename("$seasontitle$series", "-");
 	if(-e $newpath) {
 		out("warn", "File $newpath already exists, skipping.\n") unless($sortby eq "COPY" || $sortby eq "PLACE-SYMLINK");
 		return;
@@ -601,8 +614,8 @@ sub move_series {
 		}
 	}
 	# if we are here then we couldn't find a matching show, make DIR
-	out("std", "making directory: " . $tvdir . substitute_name(remdot($pureshowname))."\n");
-	unless(mkdir($tvdir . substitute_name(remdot($pureshowname)), 0777)) {
+	out("std", "making directory: " . $tvdir . escape_myfilename(substitute_name(remdot($pureshowname)))."\n");
+	unless(mkdir($tvdir . escape_myfilename(substitute_name(remdot($pureshowname))), 0777)) {
 		out("warn", "Could not create show dir: $!\n");
 		# next FILE;
 		return 0;
