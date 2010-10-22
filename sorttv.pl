@@ -159,19 +159,19 @@ sub process_args {
 		} elsif($arg =~ /^--log-file:(.*)/ || $arg =~ /^-o:(.*)/) {
 			$logfile = $1;
 		} elsif($arg =~ /^--rename-episodes:(.*)/ || $arg =~ /^-rn:(.*)/) {
-			$rename = $1 if $1 eq "TRUE";
+			$rename = $1;
 		} elsif($arg =~ /^--rename-format:(.*)/ || $arg =~ /^-rf:(.*)/) {
 			$renameformat = $1;
 		} elsif($arg =~ /^--remove-symlinks:(.*)/ || $arg =~ /^-rs:(.*)/) {
-			$removesymlinks = $1 if $1 eq "TRUE";
+			$removesymlinks = $1;
 		} elsif($arg =~ /^--use-dots-instead-of-spaces:(.*)/ || $arg =~ /^-dots:(.*)/) {
-			$usedots = $1 if $1 eq "TRUE";
+			$usedots = $1;
 		} elsif($arg =~ /^--season-title:(.*)/ || $arg =~ /^-st:(.*)/) {
 			$seasontitle = $1;
 		} elsif($arg =~ /^--sort-by:(.*)/ || $arg =~ /^-by:(.*)/) {
 			$sortby = $1;
 		} elsif($arg =~ /^--season-double-digits:(.*)/ || $arg =~ /^-sd:(.*)/) {
-			$seasondoubledigit = $1 if $1 eq "TRUE";
+			$seasondoubledigit = $1;
 		} elsif($arg =~ /^--verbose:(.*)/ || $arg =~ /^-v:(.*)/) {
 			$verbose = $1;
 		} elsif($arg =~ /^--read-config-file:(.*)/ || $arg =~ /^-conf:(.*)/) {
@@ -508,7 +508,7 @@ sub move_an_ep {
 	my $newfilename = filename($file);
 	my $newpath;
 	
-	if($rename) {
+	if($rename eq "TRUE") {
 		my $ext = my $eptitle = "";
 		unless(-d $file) {
 			$ext = $file;
@@ -539,7 +539,7 @@ sub move_an_ep {
 		# make sure it is filesystem friendly:
 		$newfilename = escape_myfilename($newfilename, "-");
 	}
-	if($usedots) {
+	if($usedots eq "TRUE") {
 		$newfilename =~ s/\s/./ig;
 	}
 
