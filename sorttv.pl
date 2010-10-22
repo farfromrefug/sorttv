@@ -107,9 +107,9 @@ sub sort_directory {
 				redo FILE;
 			}
 			# Regex for tv show episode: S01E01 or 1x1 or 1 x 1 etc
-		} elsif($file =~ /.*\/(.*)(?:\.|\s)[Ss]0*(\d+)\s*[Ee]0*(\d+).*/
-		|| $file =~ /.*\/(.*)(?:\.|\s)0*(\d+)\s*[xX]\s*0*(\d+).*/
-		|| ($matchtype eq "LIBERAL" && $file =~ /.*\/(.*)(?:\.|\s)0*(\d+)\D*0*(\d+).*/)) {
+		} elsif(filename($file) =~ /(.*)(?:\.|\s)[Ss]0*(\d+)\s*[Ee]0*(\d+).*/
+		|| filename($file) =~ /(.*)(?:\.|\s)0*(\d+)\s*[xX]\s*0*(\d+).*/
+		|| ($matchtype eq "LIBERAL" && filename($file) =~ /(.*)(?:\.|\s)0*(\d+)\D*0*(\d+).*/)) {
 			$pureshowname = $1;
 			$showname = fixtitle($pureshowname);
 			if($seasondoubledigit eq "TRUE") {
@@ -124,11 +124,14 @@ sub sort_directory {
 				}
 			}
 		} elsif(defined $nonepisodedir) {
-			out("std", "MOVING NON-EPISODE $file to $nonepisodedir\n");
+			my $newname = $file;
+			$newname =~ s/$sortdir//;
+			$newname = escape_myfilename($newname);
+			out("std", "MOVING NON-EPISODE $file to $nonepisodedir$newname\n");
 			if(-d $file) {
-				dirmove($file, $nonepisodedir . filename($file)) or out("warn", "File $file cannot be copied to $nonepisodedir. : $!");
+				dirmove($file, $nonepisodedir . $newname) or out("warn", "File $file cannot be copied to $nonepisodedir. : $!");
 			} else {
-				move($file, $nonepisodedir . filename($file)) or out("warn", "File $file cannot be copied to $nonepisodedir. : $!");
+				move($file, $nonepisodedir . $newname) or out("warn", "File $file cannot be copied to $nonepisodedir. : $!");
 			}
 		}
 	}
