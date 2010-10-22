@@ -163,8 +163,16 @@ OPTIONS:
 		How to treat directories. 
 		AS_FILES_TO_SORT - sorts directories, moving entire directories that represents an episode, also detects and moves directories of entire seasons
 		RECURSIVELY_SORT_CONTENTS - doesn't move directories, just their contents, including subdirectories
-		AS_FILES_TO_SORT/RECURSIVELY_SORT_CONTENTS/IGNORE
+		IGNORE - ignores directories
 		If not specified, RECURSIVELY_SORT_CONTENTS
+
+	--require-show-directories-already-exist:[TRUE|FALSE]
+		Only sort into show directories that already exist
+		This may be helpful if you have multiple destination directories. Just set up all the other details in the conf file, 
+		and specify the destination directory when invoking the script. Only episodes that match existing directories in the destination will be moved.
+		If this is false, then new directories are created for shows that dont have a directory.
+		TRUE/FALSE
+		If not specified, FALSE
 
 	--remove-symlinks:[TRUE|FALSE]
 		Deletes symlinks from the directory to sort while sorting.
