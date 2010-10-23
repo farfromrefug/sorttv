@@ -186,6 +186,11 @@ OPTIONS:
 		Substitutes files equal to NAME1 for NAME2
 		This argument can be repeated to add multiple rules for substitution
 
+	--force-windows-compatible-filenames:[TRUE|FALSE]
+		Forces MSWindows compatible file names, even when run on other platforms such as Linux
+		This may be helpful if you are writing to a Windows share from a Linux system
+		If not specified, FALSE
+
 EXAMPLES:
 Does a sort, as configured in sorttv.conf:
 	perl sorttv.pl

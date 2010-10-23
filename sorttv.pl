@@ -40,7 +40,7 @@ my ($sortdir, $tvdir, $nonepisodedir, $xbmcwebserver, $matchtype);
 my ($showname, $series, $episode, $pureshowname) = "";
 my ($newshows, $new, $log);
 my $REDO_FILE = my $moveseasons = "TRUE";
-my $usedots = my $rename = my $logfile = my $verbose = my $seasondoubledigit = my $removesymlinks = my $needshowexist = 0;
+my $usedots = my $rename = my $logfile = my $verbose = my $seasondoubledigit = my $removesymlinks = my $needshowexist = my $windowsnames = 0;
 my $seasontitle = "Season ";
 my $sortby = "MOVE";
 my $renameformat = "[SHOW_NAME] - [EP1][EP_NAME1]";
@@ -162,6 +162,8 @@ sub process_args {
 			$rename = $1;
 		} elsif($arg =~ /^--require-show-directories-already-exist:(.*)/ || $arg =~ /^-rs:(.*)/) {
 			$needshowexist = $1;
+		} elsif($arg =~ /^--force-windows-compatible-filenames:(.*)/ || $arg =~ /^-fw:(.*)/) {
+			$windowsnames = $1;
 		} elsif($arg =~ /^--rename-format:(.*)/ || $arg =~ /^-rf:(.*)/) {
 			$renameformat = $1;
 		} elsif($arg =~ /^--remove-symlinks:(.*)/ || $arg =~ /^-rs:(.*)/) {
@@ -353,6 +355,10 @@ OPTIONS:
 	Substitutes files equal to NAME1 for NAME2
 	This argument can be repeated to add multiple rules for substitution
 
+--force-windows-compatible-filenames:[TRUE|FALSE]
+	Forces MSWindows compatible file names, even when run on other platforms such as Linux
+	This may be helpful if you are writing to a Windows share from a Linux system
+	If not specified, FALSE
 
 EXAMPLES:
 Does a sort, as configured in sorttv.conf:
@@ -451,7 +457,7 @@ sub filename {
 
 sub escape_myfilename {
 	my ($name) = @_;
-	if($^O =~ /MSWin/) {
+	if($^O =~ /MSWin/ || $windowsnames eq "TRUE") {
 		$name =~ s/[\\\/:*?\"<>|]/-/g;
 	} else {
 		$name =~ s/[\\\/\"<>|]/-/g;
@@ -472,7 +478,8 @@ sub move_episode {
 
 	out("verbose", "INFO: trying to move $pureshowname season $series episode $episode\n");
 	SHOW: foreach my $show (bsd_glob($tvdir.'*')) {
-		if(fixtitle($show) =~ /^$showname$/i) {
+		my $subshowname = fixtitle(escape_myfilename(substitute_name($showname)));
+		if(fixtitle($show) =~ /^$showname$/i || fixtitle(escape_myfilename(substitute_name(filename($show)))) =~ /^$subshowname$/i) {
 			out("verbose", "INFO: found a matching show:\n\t$show\n");
 			my $s = $show.'/*';
 			my @g=bsd_glob($show);
