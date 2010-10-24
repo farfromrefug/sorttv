@@ -638,8 +638,12 @@ sub move_an_ep {
 
 	$newpath = $season . '/' . $newfilename;
 	if(-e $newpath) {
-		out("warn", "SKIP: File $newpath already exists, skipping.\n") unless($sortby eq "COPY" || $sortby eq "PLACE-SYMLINK");
-		return;
+		if(filename($file) =~ /repack|proper/i) {
+			out("warn", "OVERWRITE: Repack/proper version.\n");
+		} else {
+			out("warn", "SKIP: File $newpath already exists, skipping.\n") unless($sortby eq "COPY" || $sortby eq "PLACE-SYMLINK");
+			return;
+		}
 	}
 	out("std", "$sortby: sorting $file to ", $newpath, "\n");
 	if($sortby eq "MOVE" || $sortby eq "MOVE-AND-LEAVE-SYMLINK-BEHIND") {
