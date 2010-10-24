@@ -507,7 +507,7 @@ sub move_episode {
 	out("verbose", "INFO: trying to move $pureshowname season $series episode $episode\n");
 	SHOW: foreach my $show (bsd_glob($tvdir.'*')) {
 		my $subshowname = fixtitle(escape_myfilename(substitute_name($showname)));
-		if(fixtitle($show) =~ /^$showname$/i || fixtitle(escape_myfilename(substitute_name(filename($show)))) =~ /^$subshowname$/i) {
+		if(fixtitle($show) =~ /^\Q$showname\E$/i || fixtitle(escape_myfilename(substitute_name(filename($show)))) =~ /^\Q$subshowname\E$/i) {
 			out("verbose", "INFO: found a matching show:\n\t$show\n");
 			my $s = $show.'/*';
 			my @g=bsd_glob($show);
@@ -605,13 +605,13 @@ sub move_an_ep {
 			$ext =~ s/(.*\.)(.*)/\.$2/;
 		}
 		if($renameformat =~ /\[EP_NAME(\d)]/i) {
-			out("verbose", "INFO: Fetching episode name for ", substitute_name(remdot($pureshowname)), " Season $series Episode $episode.\n");
+			out("verbose", "INFO: Fetching episode title for ", substitute_name(remdot($pureshowname)), " Season $series Episode $episode.\n");
 			my $name = $tvdb->getEpisodeName(substitute_name(remdot($pureshowname)), $series, $episode);
 			if($name) {
 				$eptitle = " - $name" if $1 == 1;
 				$eptitle = ".$name" if $1 == 2;
 			} else {
-				out("warn", "WARN: Could not get episode name for ", substitute_name(remdot($pureshowname)), " Season $series Episode $episode.\n");
+				out("warn", "WARN: Could not get episode title for ", substitute_name(remdot($pureshowname)), " Season $series Episode $episode.\n");
 			}
 		}
 		my $sname = substitute_name(remdot($pureshowname));
@@ -690,7 +690,7 @@ sub move_series {
 
 	out("verbose", "INFO: trying to move $pureshowname season $series directory\n");
 	SHOW: foreach my $show (bsd_glob($tvdir.'*')) {
-		if(fixtitle($show) =~ /^$showname$/i) {
+		if(fixtitle($show) =~ /^\Q$showname\E$/i) {
 			out("verbose", "INFO: found a matching show:\n\t$show\n");
 			my $s = $show.'/*';
 			my @g=bsd_glob($show);
