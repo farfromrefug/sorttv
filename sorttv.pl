@@ -567,8 +567,10 @@ sub fetchshowimages {
 	copy ("$scriptpath/.cache/$fanart", "$newshowdir/fanart.jpg") if $fanart && -e "$scriptpath/.cache/$fanart";
 	copy ("$scriptpath/.cache/$banner", "$newshowdir/banner.jpg") if $banner && -e "$scriptpath/.cache/$banner";
 	copy ("$scriptpath/.cache/$poster", "$newshowdir/poster.jpg") if $poster && -e "$scriptpath/.cache/$poster";
-	symlink "$newshowdir/poster.jpg", "$newshowdir/folder.jpg" if $poster && -e "$scriptpath/.cache/$poster" && $imagesformat eq "POSTER";
-	symlink "$newshowdir/banner.jpg", "$newshowdir/folder.jpg" if $banner && -e "$scriptpath/.cache/$banner" && $imagesformat eq "BANNER";
+	my $ok = eval{symlink "$newshowdir/poster.jpg", "$newshowdir/folder.jpg" if $poster && -e "$scriptpath/.cache/$poster" && $imagesformat eq "POSTER";};
+	if(!defined $ok) {copy "$newshowdir/poster.jpg", "$newshowdir/folder.jpg" if $poster && -e "$scriptpath/.cache/$poster" && $imagesformat eq "POSTER";};
+	$ok = eval{symlink "$newshowdir/banner.jpg", "$newshowdir/folder.jpg" if $banner && -e "$scriptpath/.cache/$banner" && $imagesformat eq "BANNER";};
+	if(!defined $ok) {copy "$newshowdir/banner.jpg", "$newshowdir/folder.jpg" if $banner && -e "$scriptpath/.cache/$banner" && $imagesformat eq "BANNER";};
 }
 
 sub fetchseasonimages {
@@ -579,7 +581,8 @@ sub fetchseasonimages {
 	my $snum = sprintf("%02d", $season);
 	copy ("$scriptpath/.cache/$banner", "$newshowdir/season${snum}.jpg") if $banner && -e "$scriptpath/.cache/$banner" && $imagesformat eq "POSTER";
 	copy ("$scriptpath/.cache/$bannerwide", "$newshowdir/season${snum}.jpg") if $bannerwide && -e "$scriptpath/.cache/$bannerwide" && $imagesformat eq "BANNER";
-	symlink "$newshowdir/season$snum.jpg", "$seasondir/folder.jpg" if -e "$newshowdir/season$snum.jpg";
+	my $ok = eval{symlink "$newshowdir/season$snum.jpg", "$seasondir/folder.jpg" if -e "$newshowdir/season$snum.jpg";};
+	if(!defined $ok) {copy "$newshowdir/season$snum.jpg", "$seasondir/folder.jpg" if -e "$newshowdir/season$snum.jpg";};
 }
 
 sub fetchepisodeimage {
