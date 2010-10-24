@@ -191,6 +191,18 @@ OPTIONS:
 		This may be helpful if you are writing to a Windows share from a Linux system
 		If not specified, FALSE
 
+	--fetch-images:[NEW_SHOWS|FALSE]
+		Download images for shows, seasons, and episodes from thetvdb
+		Downloaded images are copied into the sort-to (destination) directory.
+		NEW_SHOWS - When new shows, seasons, or episodes are created the associated images are downloaded
+		FALSE - No images are downloaded
+		if not specified, NEW_SHOWS
+	
+	--images-format:POSTER
+		Sets the image format to use, poster or banner.
+		POSTER/BANNER
+		if not specified, POSTER
+
 EXAMPLES:
 Does a sort, as configured in sorttv.conf:
 	perl sorttv.pl

@@ -45,10 +45,13 @@ my $seasontitle = "Season ";
 my $sortby = "MOVE";
 my $renameformat = "[SHOW_NAME] - [EP1][EP_NAME1]";
 my $treatdir = "RECURSIVELY_SORT_CONTENTS";
+my $fetchimages = "NEW_SHOWS";
+my $imagesformat = "POSTER";
 my @showrenames;
+my $scriptpath = dirname(rel2abs($0));
 
 out("std", "SortTV\n", "~" x 6,"\n");
-get_config_from_file(dirname(rel2abs($0))."/"."sorttv.conf");
+get_config_from_file("$scriptpath/sorttv.conf");
 process_args(@ARGV);
 if(!defined($sortdir) || !defined($tvdir)) {
 	out("warn", "Incorrect usage or configuration (missing sort or sort-to directories)\n");
@@ -58,10 +61,18 @@ if(!defined($sortdir) || !defined($tvdir)) {
 
 my $TVDBAPIKEY = "FDDBDB916D936956";
 my $tvdb = TVDB::API::new($TVDBAPIKEY);
-if($renameformat =~ /\[EP_NAME\d]/i) {
+# if uses thetvdb, set it up
+if($renameformat =~ /\[EP_NAME\d]/i || $fetchimages ne "FALSE") {
 	my $hashref = $tvdb->getAvailableMirrors();
 	$tvdb->setMirrors($hashref);
 	$tvdb->chooseMirrors();
+	unless (-e "$scriptpath/.cache" || mkdir "$scriptpath/.cache") {
+		out("warn", "WARN: Could not create cache dir: $scriptpath/cache $!\n");
+		exit;
+	}
+	$tvdb->setCacheDB("$scriptpath/.cache/.tvdb.db");
+	$tvdb->setUserAgent("SortTV");
+	$tvdb->setBannerPath("$scriptpath/.cache/");
 }
 
 $log = FileHandle->new("$logfile", "a") or out("warn", "WARN: Could not open log file $logfile: $!\n") if $logfile;
@@ -160,6 +171,10 @@ sub process_args {
 			$logfile = $1;
 		} elsif($arg =~ /^--rename-episodes:(.*)/ || $arg =~ /^-rn:(.*)/) {
 			$rename = $1;
+		} elsif($arg =~ /^--fetch-images:(.*)/ || $arg =~ /^-fi:(.*)/) {
+			$fetchimages = $1;
+		} elsif($arg =~ /^--images-format:(.*)/ || $arg =~ /^-if:(.*)/) {
+			$imagesformat = $1;
 		} elsif($arg =~ /^--require-show-directories-already-exist:(.*)/ || $arg =~ /^-rs:(.*)/) {
 			$needshowexist = $1;
 		} elsif($arg =~ /^--force-windows-compatible-filenames:(.*)/ || $arg =~ /^-fw:(.*)/) {
@@ -360,6 +375,19 @@ OPTIONS:
 	This may be helpful if you are writing to a Windows share from a Linux system
 	If not specified, FALSE
 
+--fetch-images:[NEW_SHOWS|FALSE]
+	Download images for shows, seasons, and episodes from thetvdb
+	Downloaded images are copied into the sort-to (destination) directory.
+	NEW_SHOWS - When new shows, seasons, or episodes are created the associated images are downloaded
+	FALSE - No images are downloaded
+	if not specified, NEW_SHOWS
+
+--images-format:POSTER
+	Sets the image format to use, poster or banner.
+	POSTER/BANNER
+	if not specified, POSTER
+
+
 EXAMPLES:
 Does a sort, as configured in sorttv.conf:
 	perl sorttv.pl
@@ -499,29 +527,69 @@ sub move_episode {
 			# didn't find a matching season, make DIR
 			out("std", "INFO: making season directory: $show/$seasontitle$series\n");
 			my $newpath = "$show/$seasontitle$series";
-			unless(mkdir($newpath, 0777)) {
+			if(mkdir($newpath, 0777)) {
+				fetchseasonimages(substitute_name(remdot($pureshowname)), $show, $series, $newpath) if $fetchimages ne "FALSE";
+				redo SHOW; # try again now that the dir exists
+			} else {
 				out("warn", "WARN: Could not create season dir: $!\n");
 				# next FILE;
 				return 0;
 			}
-			redo SHOW; # try again now that the dir exists
 		}
 	}
 	if($needshowexist ne "TRUE") {
 		# if we are here then we couldn't find a matching show, make DIR
-		out("std", "INFO: making show directory: " . $tvdir . escape_myfilename(substitute_name(remdot($pureshowname)))."\n");
-		unless(mkdir($tvdir . escape_myfilename(substitute_name(remdot($pureshowname))), 0777)) {
-			out("warn", "WARN: Could not create show dir: $!\n");
+		my $newshowdir = $tvdir . escape_myfilename(substitute_name(remdot($pureshowname)));
+		out("std", "INFO: making show directory: $newshowdir\n");
+		if(mkdir($newshowdir, 0777)) {
+			fetchshowimages(substitute_name(remdot($pureshowname)), $newshowdir) if $fetchimages ne "FALSE";
+			# try again now that the dir exists
+			# redo FILE;
+			return $REDO_FILE;
+		} else {
+			out("warn", "WARN: Could not create show dir: $newshowdir:$!\n");
 			# next FILE;
 			return 0;
 		}
-		# try again now that the dir exists
-		# redo FILE;
-		return $REDO_FILE;
 	} else {
 		out("verbose", "SKIP: Show directory does not exist: " . $tvdir . escape_myfilename(substitute_name(remdot($pureshowname)))."\n");
 		# next FILE;
 		return 0;
+	}
+}
+
+sub fetchshowimages {
+	my ($fetchname, $newshowdir) = @_;
+	out("std", "DOWNLOAD: downloading images for $fetchname\n");
+	my $banner = $tvdb->getSeriesBanner($fetchname);
+	my $fanart = $tvdb->getSeriesFanart($fetchname);
+	my $poster = $tvdb->getSeriesPoster($fetchname);
+	copy ("$scriptpath/.cache/$fanart", "$newshowdir/fanart.jpg") if $fanart && -e "$scriptpath/.cache/$fanart";
+	copy ("$scriptpath/.cache/$banner", "$newshowdir/banner.jpg") if $banner && -e "$scriptpath/.cache/$banner";
+	copy ("$scriptpath/.cache/$poster", "$newshowdir/poster.jpg") if $poster && -e "$scriptpath/.cache/$poster";
+	symlink "$newshowdir/poster.jpg", "$newshowdir/folder.jpg" if $poster && -e "$scriptpath/.cache/$poster" && $imagesformat eq "POSTER";
+	symlink "$newshowdir/banner.jpg", "$newshowdir/folder.jpg" if $banner && -e "$scriptpath/.cache/$banner" && $imagesformat eq "BANNER";
+}
+
+sub fetchseasonimages {
+	my ($fetchname, $newshowdir, $season, $seasondir) = @_;
+	out("std", "DOWNLOAD: downloading season image for $fetchname\n");
+	my $banner = $tvdb->getSeasonBanner($fetchname, $season);
+	my $bannerwide = $tvdb->getSeasonBannerWide($fetchname, $season);
+	my $snum = sprintf("%02d", $season);
+	copy ("$scriptpath/.cache/$banner", "$newshowdir/season${snum}.jpg") if $banner && -e "$scriptpath/.cache/$banner" && $imagesformat eq "POSTER";
+	copy ("$scriptpath/.cache/$bannerwide", "$newshowdir/season${snum}.jpg") if $bannerwide && -e "$scriptpath/.cache/$bannerwide" && $imagesformat eq "BANNER";
+	symlink "$newshowdir/season$snum.jpg", "$seasondir/folder.jpg" if -e "$newshowdir/season$snum.jpg";
+}
+
+sub fetchepisodeimage {
+	my ($fetchname, $newshowdir, $season, $seasondir, $episode, $newfilename) = @_;
+	# if the episode was moved (or already existed)
+	if(-e "$seasondir/$newfilename") {
+		my $epimage = $tvdb->getEpisodeBanner($fetchname, $season, $episode);
+		my $newimagepath = "$seasondir/$newfilename";
+		$newimagepath =~ s/(.*)(\..*)/$1.tbn/;
+		copy ("$scriptpath/.cache/$epimage", $newimagepath) if $epimage && -e "$scriptpath/.cache/$epimage";
 	}
 }
 
@@ -590,15 +658,19 @@ sub move_an_ep {
 	if($sortby eq "MOVE-AND-LEAVE-SYMLINK-BEHIND") {
 		symlink($newpath, $file) or out("warn", "File $newpath cannot be symlinked to $file. : $!");
 	}
+	
+	fetchepisodeimage(substitute_name(remdot($pureshowname)), $show, $series, $season, $episode, $newfilename) if $fetchimages ne "FALSE";
+	
 }
 
 sub move_a_season {
 	my($file, $show, $series) = @_;
-	my $newpath = escape_myfilename($show, "-")."/".escape_myfilename("$seasontitle$series", "-");
+	my $newpath = $show."/".escape_myfilename("$seasontitle$series", "-");
 	if(-e $newpath) {
 		out("warn", "SKIP: File $newpath already exists, skipping.\n") unless($sortby eq "COPY" || $sortby eq "PLACE-SYMLINK");
 		return;
 	}
+	print "$sortby SEASON: $file to $newpath\n";	
 	out("verbose", "$sortby: sorting directory to: $newpath\n");
 	if($sortby eq "MOVE" || $sortby eq "MOVE-AND-LEAVE-SYMLINK-BEHIND") {
 		dirmove($file, "$newpath") or out("warn", "$show cannot be moved to $show/$seasontitle$series: $!");
@@ -640,15 +712,18 @@ sub move_series {
 	}
 	if($needshowexist ne "TRUE") {
 		# if we are here then we couldn't find a matching show, make DIR
-		out("std", "INFO: making directory: " . $tvdir . escape_myfilename(substitute_name(remdot($pureshowname)))."\n");
-		unless(mkdir($tvdir . escape_myfilename(substitute_name(remdot($pureshowname))), 0777)) {
-			out("warn", "WARN: Could not create show dir: $!\n");
+		my $newshowdir = $tvdir . escape_myfilename(substitute_name(remdot($pureshowname)));
+		out("std", "INFO: making show directory: $newshowdir\n");
+		if(mkdir($newshowdir, 0777)) {
+			fetchshowimages(substitute_name(remdot($pureshowname)), $newshowdir) if $fetchimages ne "FALSE";
+			# try again now that the dir exists
+			# redo FILE;
+			return $REDO_FILE;
+		} else {
+			out("warn", "WARN: Could not create show dir: $newshowdir:$!\n");
 			# next FILE;
 			return 0;
 		}
-		# try again now that the dir exists
-		# redo FILE;
-		return $REDO_FILE;
 	} else {
 		out("verbose", "SKIP: Show directory does not exist: " . $tvdir . escape_myfilename(substitute_name(remdot($pureshowname)))."\n");
 		# next FILE;
