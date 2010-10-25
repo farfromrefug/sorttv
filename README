@@ -191,6 +191,11 @@ OPTIONS:
 		This may be helpful if you are writing to a Windows share from a Linux system
 		If not specified, FALSE
 
+	--lookup-language:[en|...]
+		Set language for thetvdb lookups, this effects episode titles etc
+		Valid values include: it, zh, es, hu, nl, pl, sl, da, de, el, he, sv, eng, fi, no, fr, ru, cs, en, ja, hr, tr, ko, pt
+		If not specified, en (English)
+
 	--fetch-images:[NEW_SHOWS|FALSE]
 		Download images for shows, seasons, and episodes from thetvdb
 		Downloaded images are copied into the sort-to (destination) directory.
