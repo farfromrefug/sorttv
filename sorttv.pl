@@ -49,6 +49,7 @@ my $fetchimages = "NEW_SHOWS";
 my $imagesformat = "POSTER";
 my @showrenames;
 my $scriptpath = dirname(rel2abs($0));
+my $tvdblanguage = "en";
 
 out("std", "SortTV\n", "~" x 6,"\n");
 get_config_from_file("$scriptpath/sorttv.conf");
@@ -63,6 +64,7 @@ my $TVDBAPIKEY = "FDDBDB916D936956";
 my $tvdb = TVDB::API::new($TVDBAPIKEY);
 # if uses thetvdb, set it up
 if($renameformat =~ /\[EP_NAME\d]/i || $fetchimages ne "FALSE") {
+	$tvdb->setLang($tvdblanguage);
 	my $hashref = $tvdb->getAvailableMirrors();
 	$tvdb->setMirrors($hashref);
 	$tvdb->chooseMirrors();
@@ -171,6 +173,8 @@ sub process_args {
 			$logfile = $1;
 		} elsif($arg =~ /^--rename-episodes:(.*)/ || $arg =~ /^-rn:(.*)/) {
 			$rename = $1;
+		} elsif($arg =~ /^--lookup-language:(.*)/ || $arg =~ /^-lang:(.*)/) {
+			$tvdblanguage = $1;
 		} elsif($arg =~ /^--fetch-images:(.*)/ || $arg =~ /^-fi:(.*)/) {
 			$fetchimages = $1;
 		} elsif($arg =~ /^--images-format:(.*)/ || $arg =~ /^-if:(.*)/) {
