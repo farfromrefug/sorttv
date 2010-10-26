@@ -189,7 +189,7 @@ OPTIONS:
 	--force-windows-compatible-filenames:[TRUE|FALSE]
 		Forces MSWindows compatible file names, even when run on other platforms such as Linux
 		This may be helpful if you are writing to a Windows share from a Linux system
-		If not specified, FALSE
+		If not specified, TRUE
 
 	--lookup-language:[en|...]
 		Set language for thetvdb lookups, this effects episode titles etc

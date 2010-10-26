@@ -41,8 +41,8 @@ use strict;
 my ($sortdir, $tvdir, $nonepisodedir, $xbmcwebserver, $matchtype);
 my ($showname, $series, $episode, $pureshowname) = "";
 my ($newshows, $new, $log);
-my $REDO_FILE = my $moveseasons = "TRUE";
-my $usedots = my $rename = my $logfile = my $verbose = my $seasondoubledigit = my $removesymlinks = my $needshowexist = my $windowsnames = 0;
+my $REDO_FILE = my $moveseasons = my $windowsnames = "TRUE";
+my $usedots = my $rename = my $logfile = my $verbose = my $seasondoubledigit = my $removesymlinks = my $needshowexist = 0;
 my $seasontitle = "Season ";
 my $sortby = "MOVE";
 my $renameformat = "[SHOW_NAME] - [EP1][EP_NAME1]";
@@ -381,7 +381,7 @@ OPTIONS:
 --force-windows-compatible-filenames:[TRUE|FALSE]
 	Forces MSWindows compatible file names, even when run on other platforms such as Linux
 	This may be helpful if you are writing to a Windows share from a Linux system
-	If not specified, FALSE
+	If not specified, TRUE
 
 --lookup-language:[en|...]
 	Set language for thetvdb lookups, this effects episode titles etc
