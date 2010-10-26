@@ -467,8 +467,9 @@ sub substitute_name {
 	my ($from) = @_;
 	foreach my $substitute (@showrenames) {
 		if($substitute =~ /(.*)-->(.*)/) {
-			if($from eq $1) {
-				return $2;
+			my $subsrc = $1, my $subdest = $2;
+			if($from =~ /^\Q$subsrc\E$/i) {
+				return $subdest;
 			}
 		}
 	}
