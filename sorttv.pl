@@ -50,6 +50,7 @@ my $imagesformat = "POSTER";
 my @showrenames;
 my $scriptpath = dirname(rel2abs($0));
 my $tvdblanguage = "en";
+my $tvdb;
 
 out("std", "SortTV\n", "~" x 6,"\n");
 get_config_from_file("$scriptpath/sorttv.conf");
@@ -60,10 +61,11 @@ if(!defined($sortdir) || !defined($tvdir)) {
 	exit;
 }
 
-my $TVDBAPIKEY = "FDDBDB916D936956";
-my $tvdb = TVDB::API::new($TVDBAPIKEY);
 # if uses thetvdb, set it up
 if($renameformat =~ /\[EP_NAME\d]/i || $fetchimages ne "FALSE") {
+	my $TVDBAPIKEY = "FDDBDB916D936956";
+	$tvdb = TVDB::API::new($TVDBAPIKEY);
+
 	$tvdb->setLang($tvdblanguage);
 	my $hashref = $tvdb->getAvailableMirrors();
 	$tvdb->setMirrors($hashref);
