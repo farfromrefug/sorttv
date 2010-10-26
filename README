@@ -52,7 +52,7 @@ Edit the sorttv.conf file to the settings you want (at minimum specify the locat
 
 You may need to install the modules the script uses.
 To do so, run this command on Linux:
-sudo cpan File::Copy::Recursive File::Glob LWP::Simple TVDB::API
+sudo cpan File::Copy::Recursive File::Glob LWP::Simple TVDB::API Text::Capitalize
 On Windows run the same command, without "sudo"
 
 If you want to make it sort new episodes every hour:

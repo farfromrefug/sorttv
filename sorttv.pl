@@ -11,6 +11,7 @@
 # other contributers:
 # salithus - xbmc forum
 # schmoko - xbmc forum
+# CoinTos - xbmc forum
 #
 # Please goto the xbmc forum to discuss SortTV:
 # http://forum.xbmc.org/showthread.php?t=75949
@@ -32,6 +33,7 @@ use File::Spec::Functions "rel2abs";
 use File::Basename;
 use TVDB::API;
 use File::Find;
+use Text::Capitalize;
 use FileHandle;
 use warnings;
 use strict;
@@ -550,7 +552,7 @@ sub move_episode {
 	}
 	if($needshowexist ne "TRUE") {
 		# if we are here then we couldn't find a matching show, make DIR
-		my $newshowdir = $tvdir . escape_myfilename(substitute_name(remdot($pureshowname)));
+		my $newshowdir = $tvdir .escape_myfilename(substitute_name(capitalize_title(remdot($pureshowname), PRESERVE_ALLCAPS => 1)));
 		out("std", "INFO: making show directory: $newshowdir\n");
 		if(mkdir($newshowdir, 0777)) {
 			fetchshowimages(substitute_name(remdot($pureshowname)), $newshowdir) if $fetchimages ne "FALSE";
@@ -628,7 +630,7 @@ sub move_an_ep {
 				out("warn", "WARN: Could not get episode title for ", substitute_name(remdot($pureshowname)), " Season $series Episode $episode.\n");
 			}
 		}
-		my $sname = substitute_name(remdot($pureshowname));
+		my $sname = substitute_name(capitalize_title(remdot($pureshowname), PRESERVE_ALLCAPS => 1));
 		my $ep1 = sprintf("S%02dE%02d", $series, $episode);
 		my $ep2 = sprintf("%dx%d", $series, $episode);
 		my $ep3 = sprintf("%dx%02d", $series, $episode);
@@ -730,7 +732,7 @@ sub move_series {
 	}
 	if($needshowexist ne "TRUE") {
 		# if we are here then we couldn't find a matching show, make DIR
-		my $newshowdir = $tvdir . escape_myfilename(substitute_name(remdot($pureshowname)));
+		my $newshowdir = $tvdir .escape_myfilename(substitute_name(capitalize_title(remdot($pureshowname), PRESERVE_ALLCAPS => 1)));
 		out("std", "INFO: making show directory: $newshowdir\n");
 		if(mkdir($newshowdir, 0777)) {
 			fetchshowimages(substitute_name(remdot($pureshowname)), $newshowdir) if $fetchimages ne "FALSE";
