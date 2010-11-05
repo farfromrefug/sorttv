@@ -37,6 +37,9 @@ https://sourceforge.net/projects/sorttv/files/
 Please goto the xbmc forum to discuss SortTV:
 http://forum.xbmc.org/showthread.php?t=75949
 
+Paypal donations:
+http://sourceforge.net/donate/index.php?group_id=330009
+
 ---
 This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -50,10 +53,13 @@ You need to install Perl and then save sorttv.pl wherever. Eg: on Linux into /ho
 
 Edit the sorttv.conf file to the settings you want (at minimum specify the location of the directories to sort from and to)
 
-You may need to install the modules the script uses.
+Install the modules the script uses.
 To do so, run this command on Linux:
 sudo cpan File::Copy::Recursive File::Glob LWP::Simple TVDB::API Text::Capitalize
 On Windows run the same command, without "sudo"
+
+---
+Automation
 
 If you want to make it sort new episodes every hour:
 
@@ -113,6 +119,10 @@ OPTIONS:
 		Secondary config file, overwrites settings loaded so far
 		If not specified, only the default config file is loaded (sorttv.conf)
 
+	--fetch-show-title:[TRUE|FALSE]
+		Fetch show titles from thetvdb.com (for proper formatting)
+		If not specified, TRUE
+
 	--rename-episodes:[TRUE|FALSE]
 		Rename episodes to "show name S01E01.ext" format when moving
 		If not specified, FALSE
@@ -153,6 +163,14 @@ OPTIONS:
 		LIBERAL assumes all files are episodes and tries to extract season and episode number any way possible.
 		If not specified, NORMAL
 
+	--match-files-named-showname-episodetitle:[TRUE|FALSE]
+		Attempt to sort files that are named after the show and episode title.
+		For example, "My show - My episode title.avi" could become "My Show - S01E01 - My episode title.avi"
+		Attempts to lookup the season and episode number based on the episodes in thetvdb.com database.
+		Since this involves downloading the list of episodes from the Internet, this will cause a slower sort.
+		If not specified, FALSE
+
+
 	--sort-by:[MOVE|COPY|MOVE-AND-LEAVE-SYMLINK-BEHIND|PLACE-SYMLINK]
 		Sort by moving or copying the file. If the file already exists because it was already copied it is silently skipped.
 		The MOVE-AND-LEAVE-SYMLINK-BEHIND option may be handy if you want to continue to seed after sorting, this leaves a symlink in place of the newly moved file.
@@ -184,6 +202,10 @@ OPTIONS:
 
 	--show-name-substitute:NAME1-->NAME2
 		Substitutes files equal to NAME1 for NAME2
+		This argument can be repeated to add multiple rules for substitution
+
+	--tvdb-id-substitute:NAME1-->ID
+		Use these thetvdb.com IDs to lookup these shows
 		This argument can be repeated to add multiple rules for substitution
 
 	--force-windows-compatible-filenames:[TRUE|FALSE]
@@ -230,6 +252,6 @@ And so on...
 Enjoy!
 
 Paypal donations welcome:
-http://schreuders.org
+http://sourceforge.net/donate/index.php?group_id=330009
 
 If you find this script helpful then please consider making a $5 paypal donation :)

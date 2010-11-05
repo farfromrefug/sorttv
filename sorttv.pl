@@ -1,14 +1,16 @@
 #!/usr/bin/perl
 
-# 2010 Z. Cliffe Schreuders
-# free software: GPL v3 or later
-# 
-# sorts tv shows into tvshow/series directories
-# if the dirs don't exist they are created
-# updates xbmc via the web interface
-# unsorted files are moved to a dir if specifed
+# SortTV
+# Copyleft 2010
+# Z. Cliffe Schreuders
 #
-# other contributers:
+# Sorts tv shows into tvshow/series directories;
+# If the dirs don't exist they are created;
+# Updates xbmc via the web interface;
+# Unsorted files are moved to a dir if specifed;
+# Lots of other features.
+#
+# Other contributers:
 # salithus - xbmc forum
 # schmoko - xbmc forum
 # CoinTos - xbmc forum
@@ -23,6 +25,12 @@
 # http://schreuders.org/
 # 
 # Please consider a $5 donation if you find this program helpful.
+# http://sourceforge.net/donate/index.php?group_id=330009
+
+# This program is free software: you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation, either version 3 of the License, or
+#  (at your option) any later version.# 
 
 
 use File::Copy::Recursive "dirmove", "dircopy";
@@ -33,7 +41,6 @@ use File::Spec::Functions "rel2abs";
 use File::Basename;
 use TVDB::API;
 use File::Find;
-use Text::Capitalize;
 use FileHandle;
 use warnings;
 use strict;
@@ -41,15 +48,16 @@ use strict;
 my ($sortdir, $tvdir, $nonepisodedir, $xbmcwebserver, $matchtype);
 my ($showname, $series, $episode, $pureshowname) = "";
 my ($newshows, $new, $log);
-my $REDO_FILE = my $moveseasons = my $windowsnames = "TRUE";
-my $usedots = my $rename = my $logfile = my $verbose = my $seasondoubledigit = my $removesymlinks = my $needshowexist = 0;
+my (@showrenames, @showtvdbids);
+my $REDO_FILE = my $moveseasons = my $windowsnames = my $tvdbrename = my $lookupseasonep = "TRUE";
+my $usedots = my $rename = my $verbose = my $seasondoubledigit = my $removesymlinks = my $needshowexist = "FALSE";
+my $logfile = 0;
 my $seasontitle = "Season ";
 my $sortby = "MOVE";
 my $renameformat = "[SHOW_NAME] - [EP1][EP_NAME1]";
 my $treatdir = "RECURSIVELY_SORT_CONTENTS";
 my $fetchimages = "NEW_SHOWS";
 my $imagesformat = "POSTER";
-my @showrenames;
 my $scriptpath = dirname(rel2abs($0));
 my $tvdblanguage = "en";
 my $tvdb;
@@ -64,7 +72,8 @@ if(!defined($sortdir) || !defined($tvdir)) {
 }
 
 # if uses thetvdb, set it up
-if($renameformat =~ /\[EP_NAME\d]/i || $fetchimages ne "FALSE") {
+if($renameformat =~ /\[EP_NAME\d]/i || $fetchimages ne "FALSE" 
+  || $lookupseasonep ne "FALSE" || $lookupseasonep ne "FALSE") {
 	my $TVDBAPIKEY = "FDDBDB916D936956";
 	$tvdb = TVDB::API::new($TVDBAPIKEY);
 
@@ -140,6 +149,26 @@ sub sort_directory {
 					redo FILE;
 				}
 			}
+		} elsif($lookupseasonep eq "TRUE" && filename($file) =~ /(.*)-(.*)(?:\..*)/) {
+			$pureshowname = $1;
+			$showname = fixtitle($pureshowname);
+			my $episodetitle = fixtitle($2);
+			$series = "";
+			$episode = "";
+			# calls fetchseasonep to try and find season and episode numbers: returns array [0] = Season [1] = Episode
+			my @foundseasonep = fetchseasonep(resolve_show_name($pureshowname), $episodetitle);
+			if(exists $foundseasonep[1]) {
+				$series = $foundseasonep[0];
+				$episode = $foundseasonep[1];
+			}
+			if($series ne "" && $episode ne "") {
+				if($seasondoubledigit eq "TRUE") {
+					$series = sprintf("%02d", $2);
+				}
+				if(move_episode($pureshowname, $showname, $series, $episode, $file) eq $REDO_FILE) {
+					redo FILE;
+				}
+			}
 		} elsif(defined $nonepisodedir) {
 			my $newname = $file;
 			$newname =~ s/$sortdir//;
@@ -173,8 +202,12 @@ sub process_args {
 			$treatdir = $1;
 		} elsif($arg =~ /^--show-name-substitute:(.*-->.*)/ || $arg =~ /^-sub:(.*-->.*)/) {
 			push @showrenames, $1;
+		} elsif($arg =~ /^--tvdb-id-substitute:(.*-->.*)/ || $arg =~ /^-tis:(.*-->.*)/) {
+			push @showtvdbids, $1;
 		} elsif($arg =~ /^--log-file:(.*)/ || $arg =~ /^-o:(.*)/) {
 			$logfile = $1;
+		} elsif($arg =~ /^--fetch-show-title:(.*)/ || $arg =~ /^-fst:(.*)/) {
+			$tvdbrename = $1;
 		} elsif($arg =~ /^--rename-episodes:(.*)/ || $arg =~ /^-rn:(.*)/) {
 			$rename = $1;
 		} elsif($arg =~ /^--lookup-language:(.*)/ || $arg =~ /^-lang:(.*)/) {
@@ -199,6 +232,8 @@ sub process_args {
 			$sortby = $1;
 		} elsif($arg =~ /^--season-double-digits:(.*)/ || $arg =~ /^-sd:(.*)/) {
 			$seasondoubledigit = $1;
+		} elsif($arg =~ /^--match-files-named-showname-episodetitle:(.*)/ || $arg =~ /^-lse:(.*)/) {
+			$lookupseasonep = $1;
 		} elsif($arg =~ /^--verbose:(.*)/ || $arg =~ /^-v:(.*)/) {
 			$verbose = $1;
 		} elsif($arg =~ /^--read-config-file:(.*)/ || $arg =~ /^-conf:(.*)/) {
@@ -306,6 +341,10 @@ OPTIONS:
 	Secondary config file, overwrites settings loaded so far
 	If not specified, only the default config file is loaded (sorttv.conf)
 
+--fetch-show-title:[TRUE|FALSE]
+	Fetch show titles from thetvdb.com (for proper formatting)
+	If not specified, TRUE
+
 --rename-episodes:[TRUE|FALSE]
 	Rename episodes to "show name S01E01.ext" format when moving
 	If not specified, FALSE
@@ -326,7 +365,7 @@ OPTIONS:
 		--rename-format:[SHOW_NAME] - [EP1][EP_NAME1]
 		for "My Show.S01E01.Episode Title"
 		--rename-format:[SHOW_NAME].[EP1][EP_NAME2]
-		
+
 --use-dots-instead-of-spaces:[TRUE|FALSE]
 	Renames episodes to replace spaces with dots
 	If not specified, FALSE
@@ -345,6 +384,13 @@ OPTIONS:
 	Match type. 
 	LIBERAL assumes all files are episodes and tries to extract season and episode number any way possible.
 	If not specified, NORMAL
+
+--match-files-named-showname-episodetitle:[TRUE|FALSE]
+	Attempt to sort files that are named after the show and episode title.
+	For example, "My show - My episode title.avi" could become "My Show - S01E01 - My episode title.avi"
+	Attempts to lookup the season and episode number based on the episodes in thetvdb.com database.
+	Since this involves downloading the list of episodes from the Internet, this will cause a slower sort.
+	If not specified, TRUE
 
 --sort-by:[MOVE|COPY|MOVE-AND-LEAVE-SYMLINK-BEHIND|LEAVE-AND-PLACE-SYMLINK]
 	Sort by moving or copying the file. If the file already exists because it was already copied it is silently skipped.
@@ -375,7 +421,11 @@ OPTIONS:
 	If not specified, FALSE
 
 --show-name-substitute:NAME1-->NAME2
-	Substitutes files equal to NAME1 for NAME2
+	Substitutes names equal to NAME1 for NAME2
+	This argument can be repeated to add multiple rules for substitution
+
+--tvdb-id-substitute:NAME1-->TVDB ID
+	Substitutes names equal to NAME1 for TVDB ID for lookups
 	This argument can be repeated to add multiple rules for substitution
 
 --force-windows-compatible-filenames:[TRUE|FALSE]
@@ -452,10 +502,10 @@ sub displayandupdateinfo {
 # removes the dir path
 sub fixtitle {
 	my ($title) = @_;
-	$title = substitute_name($title);
 	$title =~ s/,|\.the\.|\bthe\b//ig;
 	$title =~ s/\.and\.|\band\b//ig;
 	$title =~ s/&|\+//ig;
+	$title =~ s/'//ig;
 	$title =~ s/(.*\/)(.*)/$2/;
 	$title = remdot($title);
 	$title =~ s/\d|\s|\(|\)//ig;
@@ -467,8 +517,8 @@ sub substitute_name {
 	my ($from) = @_;
 	foreach my $substitute (@showrenames) {
 		if($substitute =~ /(.*)-->(.*)/) {
-			my $subsrc = $1, my $subdest = $2;
-			if($from =~ /^\Q$subsrc\E$/i) {
+			my $subdest = $2, my $subsrc = fixtitle($1);
+			if(fixtitle($from) =~ /^\Q$subsrc\E$/i) {
 				return $subdest;
 			}
 		}
@@ -477,13 +527,37 @@ sub substitute_name {
 	return $from;
 }
 
+# resolves a raw text string to a show name
+# starts by checking if there is a literal rule substituting the string as is
+# then removes dots dashes etc, and tries a substution again
+# then checks if there is a tvdbid, if so renames using database
+sub resolve_show_name {
+	my ($title) = @_;
+	return tvdb_title(substitute_name(remdot($title)));
+}
+
+# Use tvdb IDs to lookup shows
+# returns the ID if available, or an empty string
+sub substitute_tvdb_id {
+	my ($from) = @_;
+	foreach my $substitute (@showtvdbids) {
+		if($substitute =~ /(.*)-->(.*)/) {
+			my $subdest = $2, my $subsrc = fixtitle($1);
+			if(fixtitle($from) =~ /^\Q$subsrc\E$/i) {
+				return $subdest;
+			}
+		}
+	}
+	# if no matches, returns unchanged
+	return "";
+}
+
 # removes dots and underscores for creating dirs
 sub remdot {
 	my ($title) = @_;
 	$title =~ s/\./ /ig;
 	$title =~ s/_/ /ig;
 	$title =~ s/-//ig;
-	$title =~ s/'//ig;
 	# don't start or end on whitespace
 	$title =~ s/\s$//ig;
 	$title =~ s/^\s//ig;
@@ -520,8 +594,9 @@ sub move_episode {
 
 	out("verbose", "INFO: trying to move $pureshowname season $series episode $episode\n");
 	SHOW: foreach my $show (bsd_glob($tvdir.'*')) {
-		my $subshowname = fixtitle(escape_myfilename(substitute_name($showname)));
-		if(fixtitle($show) =~ /^\Q$showname\E$/i || fixtitle(escape_myfilename(substitute_name(filename($show)))) =~ /^\Q$subshowname\E$/i) {
+		# test if it matches a simple version, or a substituted version of the file to move
+		my $subshowname = fixtitle(escape_myfilename(resolve_show_name($showname)));
+		if(fixtitle(filename($show)) =~ /^\Q$showname\E$/i || fixtitle(escape_myfilename(filename($show))) =~ /^\Q$subshowname\E$/i) {
 			out("verbose", "INFO: found a matching show:\n\t$show\n");
 			my $s = $show.'/*';
 			my @g=bsd_glob($show);
@@ -529,11 +604,6 @@ sub move_episode {
 				if(-d $season.'/' && $season =~ /(?:Season|Series|$seasontitle)?\s?0*(\d+)$/i && $1 == $series) {
 					out("verbose", "INFO: found a matching season:\n\t$season\n");
 					move_an_ep($file, $season, $show, $series, $episode);
-					if($xbmcwebserver) {
-						$new = "$showname season $series episode $episode";
-						displayandupdateinfo($new, $xbmcwebserver);
-						$newshows .= "$new\n";
-					}
 					# next FILE;
 					return 0;
 				}
@@ -542,7 +612,7 @@ sub move_episode {
 			out("std", "INFO: making season directory: $show/$seasontitle$series\n");
 			my $newpath = "$show/$seasontitle$series";
 			if(mkdir($newpath, 0777)) {
-				fetchseasonimages(substitute_name(remdot($pureshowname)), $show, $series, $newpath) if $fetchimages ne "FALSE";
+				fetchseasonimages(resolve_show_name($pureshowname), $show, $series, $newpath) if $fetchimages ne "FALSE";
 				redo SHOW; # try again now that the dir exists
 			} else {
 				out("warn", "WARN: Could not create season dir: $!\n");
@@ -553,10 +623,10 @@ sub move_episode {
 	}
 	if($needshowexist ne "TRUE") {
 		# if we are here then we couldn't find a matching show, make DIR
-		my $newshowdir = $tvdir .escape_myfilename(substitute_name(capitalize_title(remdot($pureshowname), PRESERVE_ALLCAPS => 1)));
+		my $newshowdir = $tvdir .escape_myfilename(resolve_show_name($pureshowname));
 		out("std", "INFO: making show directory: $newshowdir\n");
 		if(mkdir($newshowdir, 0777)) {
-			fetchshowimages(substitute_name(remdot($pureshowname)), $newshowdir) if $fetchimages ne "FALSE";
+			fetchshowimages(resolve_show_name($pureshowname), $newshowdir) if $fetchimages ne "FALSE";
 			# try again now that the dir exists
 			# redo FILE;
 			return $REDO_FILE;
@@ -566,7 +636,7 @@ sub move_episode {
 			return 0;
 		}
 	} else {
-		out("verbose", "SKIP: Show directory does not exist: " . $tvdir . escape_myfilename(substitute_name(remdot($pureshowname)))."\n");
+		out("verbose", "SKIP: Show directory does not exist: " . $tvdir . escape_myfilename(resolve_show_name($pureshowname))."\n");
 		# next FILE;
 		return 0;
 	}
@@ -601,13 +671,75 @@ sub fetchseasonimages {
 
 sub fetchepisodeimage {
 	my ($fetchname, $newshowdir, $season, $seasondir, $episode, $newfilename) = @_;
-	# if the episode was moved (or already existed)
-	if(-e "$seasondir/$newfilename") {
-		my $epimage = $tvdb->getEpisodeBanner($fetchname, $season, $episode);
-		my $newimagepath = "$seasondir/$newfilename";
-		$newimagepath =~ s/(.*)(\..*)/$1.tbn/;
-		copy ("$scriptpath/.cache/$epimage", $newimagepath) if $epimage && -e "$scriptpath/.cache/$epimage";
+	my $epimage = $tvdb->getEpisodeBanner($fetchname, $season, $episode);
+	my $newimagepath = "$seasondir/$newfilename";
+	$newimagepath =~ s/(.*)(\..*)/$1.tbn/;
+	copy ("$scriptpath/.cache/$epimage", $newimagepath) if $epimage && -e "$scriptpath/.cache/$epimage";
+}
+
+# lookup episode details based on show name and episode title
+sub fetchseasonep {
+	my ($show, $eptitle) = @_;
+	# make sure we have all the series data in cache
+	my $seriesall = $tvdb->getSeries(resolve_show_name($show));
+	my @seasonep;
+	my $season = 1;
+	# get the show name from the hash
+	my $showtitle = $seriesall->{'SeriesName'};
+
+	if(defined $showtitle) {
+		# make sure you know what season to stop at
+		my $maxseasons = $tvdb->getMaxSeason($seriesall->{'SeriesName'});
+		# work through the seasons
+		while($season <= $maxseasons) {
+			my @epid = $tvdb->getSeason($showtitle, $season);
+			my $spot = 1;
+			# process each episode id
+			while($epid[0]) {
+				if(defined($epid[0][$spot])) {
+					my $epdetails = $tvdb->getEpisodeId($epid[0][$spot]);
+					if(defined($epdetails)) {
+						# compare the Episode to the one in the search
+						if(fixtitle($epdetails->{'EpisodeName'}) =~ /^\Q$eptitle\E$/) {
+							$seasonep[0] = $epdetails->{'SeasonNumber'};
+							$seasonep[1] = $epdetails->{'EpisodeNumber'};
+							# pass back the Season Number and Episode Number in an array
+							return @seasonep;
+						}
+					}
+					$spot++;
+				} else {
+					last;
+				}
+			}
+			$season++;
+		}
+	} else {
+		out("std", "WARN: Failed to get " . $show . " series information on the tvdb.com.\n");
 	}
+	return @seasonep;
+}
+
+# if the option is enabled, looks up the show title using the substitute_tvdb_id then the filename
+# returns the title with the format from thetvdb.com, or if not found the original string
+sub tvdb_title {
+	my ($filetitle) = @_;
+	if($tvdbrename eq "TRUE") {
+		my $id_sub = substitute_tvdb_id($filetitle);
+		if($id_sub) {
+			my $newname = $tvdb->getSeriesName($id_sub);
+			if($newname) {
+				return $newname;
+			}
+		}
+		my $retval;
+		$retval = $tvdb->getSeries($filetitle);
+		# if it finds one return it
+		if(defined($retval)) {
+			return $retval->{'SeriesName'};
+		}		
+	}
+	return $filetitle;
 }
 
 sub move_an_ep {
@@ -615,6 +747,7 @@ sub move_an_ep {
 	my $newfilename = filename($file);
 	my $newpath;
 	
+	my $ep1 = sprintf("S%02dE%02d", $series, $episode);
 	if($rename eq "TRUE") {
 		my $ext = my $eptitle = "";
 		unless(-d $file) {
@@ -622,17 +755,16 @@ sub move_an_ep {
 			$ext =~ s/(.*\.)(.*)/\.$2/;
 		}
 		if($renameformat =~ /\[EP_NAME(\d)]/i) {
-			out("verbose", "INFO: Fetching episode title for ", substitute_name(remdot($pureshowname)), " Season $series Episode $episode.\n");
-			my $name = $tvdb->getEpisodeName(substitute_name(remdot($pureshowname)), $series, $episode);
+			out("verbose", "INFO: Fetching episode title for ", resolve_show_name($pureshowname), " Season $series Episode $episode.\n");
+			my $name = $tvdb->getEpisodeName(resolve_show_name($pureshowname), $series, $episode);
 			if($name) {
 				$eptitle = " - $name" if $1 == 1;
 				$eptitle = ".$name" if $1 == 2;
 			} else {
-				out("warn", "WARN: Could not get episode title for ", substitute_name(remdot($pureshowname)), " Season $series Episode $episode.\n");
+				out("warn", "WARN: Could not get episode title for ", resolve_show_name($pureshowname), " Season $series Episode $episode.\n");
 			}
 		}
-		my $sname = substitute_name(capitalize_title(remdot($pureshowname), PRESERVE_ALLCAPS => 1));
-		my $ep1 = sprintf("S%02dE%02d", $series, $episode);
+		my $sname = resolve_show_name($pureshowname);
 		my $ep2 = sprintf("%dx%d", $series, $episode);
 		my $ep3 = sprintf("%dx%02d", $series, $episode);
 		# create the new file name
@@ -679,9 +811,17 @@ sub move_an_ep {
 	if($sortby eq "MOVE-AND-LEAVE-SYMLINK-BEHIND") {
 		symlink($newpath, $file) or out("warn", "File $newpath cannot be symlinked to $file. : $!");
 	}
-	
-	fetchepisodeimage(substitute_name(remdot($pureshowname)), $show, $series, $season, $episode, $newfilename) if $fetchimages ne "FALSE";
-	
+	# if the episode was moved (or already existed)
+	if(-e $newpath) {
+		if ($fetchimages ne "FALSE") {
+			fetchepisodeimage(resolve_show_name($pureshowname), $show, $series, $season, $episode, $newfilename);
+		}
+		if($xbmcwebserver) {
+			$new = resolve_show_name($pureshowname) . " $ep1";
+			displayandupdateinfo($new, $xbmcwebserver);
+			$newshows .= "$new\n";
+		}
+	}
 }
 
 sub move_a_season {
@@ -691,7 +831,7 @@ sub move_a_season {
 		out("warn", "SKIP: File $newpath already exists, skipping.\n") unless($sortby eq "COPY" || $sortby eq "PLACE-SYMLINK");
 		return;
 	}
-	print "$sortby SEASON: $file to $newpath\n";	
+	out("std", "$sortby SEASON: $file to $newpath\n");
 	out("verbose", "$sortby: sorting directory to: $newpath\n");
 	if($sortby eq "MOVE" || $sortby eq "MOVE-AND-LEAVE-SYMLINK-BEHIND") {
 		dirmove($file, "$newpath") or out("warn", "$show cannot be moved to $show/$seasontitle$series: $!");
@@ -733,10 +873,10 @@ sub move_series {
 	}
 	if($needshowexist ne "TRUE") {
 		# if we are here then we couldn't find a matching show, make DIR
-		my $newshowdir = $tvdir .escape_myfilename(substitute_name(capitalize_title(remdot($pureshowname), PRESERVE_ALLCAPS => 1)));
+		my $newshowdir = $tvdir .escape_myfilename(resolve_show_name($pureshowname));
 		out("std", "INFO: making show directory: $newshowdir\n");
 		if(mkdir($newshowdir, 0777)) {
-			fetchshowimages(substitute_name(remdot($pureshowname)), $newshowdir) if $fetchimages ne "FALSE";
+			fetchshowimages(resolve_show_name($pureshowname), $newshowdir) if $fetchimages ne "FALSE";
 			# try again now that the dir exists
 			# redo FILE;
 			return $REDO_FILE;
@@ -746,7 +886,7 @@ sub move_series {
 			return 0;
 		}
 	} else {
-		out("verbose", "SKIP: Show directory does not exist: " . $tvdir . escape_myfilename(substitute_name(remdot($pureshowname)))."\n");
+		out("verbose", "SKIP: Show directory does not exist: " . $tvdir . escape_myfilename(resolve_show_name($pureshowname))."\n");
 		# next FILE;
 		return 0;
 	}
