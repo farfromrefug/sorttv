@@ -96,6 +96,7 @@ OPTIONS:
 	--directory-to-sort-into:dir
 		Where to sort episodes into (dir that will contain dirs for each show)
 		This directory will contain the structure (Show)/(Seasons)/(episodes)
+		Alternatively set this to "KEEP_IN_SAME_DIRECTORIES" for a recursive renaming of files in directory-to-sort
 
 	--non-episode-dir:dir
 		Where to put things that are not episodes
@@ -229,6 +230,14 @@ OPTIONS:
 		Sets the image format to use, poster or banner.
 		POSTER/BANNER
 		if not specified, POSTER
+
+	--no-network
+		Disables all the network enabled features such as:
+			Disables notifying xbmc
+			Disables tvdb title formatting
+			Disables fetching images
+			Disables looking up files named "Show - EpTitle.ext"
+			Changes rename format (if applicable) to not include episode titles
 
 EXAMPLES:
 Does a sort, as configured in sorttv.conf:
