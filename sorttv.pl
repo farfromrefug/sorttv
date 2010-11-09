@@ -576,7 +576,7 @@ sub substitute_tvdb_id {
 		}
 	}
 	# if no matches, returns unchanged
-	return "";
+	return $from;
 }
 
 # removes dots and underscores for creating dirs
@@ -771,7 +771,7 @@ sub tvdb_title {
 	my ($filetitle) = @_;
 	if($tvdbrename eq "TRUE") {
 		my $id_sub = substitute_tvdb_id($filetitle);
-		if($id_sub) {
+		if($id_sub =~ /^[+-]?\d+$/) {
 			my $newname = $tvdb->getSeriesName($id_sub);
 			if($newname) {
 				return $newname;
@@ -801,7 +801,7 @@ sub move_an_ep {
 		}
 		if($renameformat =~ /\[EP_NAME(\d)]/i) {
 			out("verbose", "INFO: Fetching episode title for ", resolve_show_name($pureshowname), " Season $series Episode $episode.\n");
-			my $name = $tvdb->getEpisodeName(resolve_show_name($pureshowname), $series, $episode);
+			my $name = $tvdb->getEpisodeName(substitute_tvdb_id(resolve_show_name($pureshowname)), $series, $episode);
 			if($name) {
 				$eptitle = " - $name" if $1 == 1;
 				$eptitle = ".$name" if $1 == 2;
