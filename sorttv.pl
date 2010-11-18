@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 
 # SortTV
-# Copyleft 2010
+# Copyleft (ↄ) 2010
 # Z. Cliffe Schreuders
 #
 # Sorts tv shows into tvshow/series directories;
@@ -46,7 +46,7 @@ use warnings;
 use strict;
 
 my ($sortdir, $tvdir, $nonepisodedir, $xbmcwebserver, $matchtype);
-my ($showname, $series, $episode, $pureshowname, $forceeptitle) = "";
+my ($showname, $series, $episode, $pureshowname) = "";
 my ($newshows, $new, $log);
 my (@showrenames, @showtvdbids);
 my $REDO_FILE = my $moveseasons = my $windowsnames = my $tvdbrename = my $lookupseasonep = "TRUE";
@@ -61,6 +61,7 @@ my $imagesformat = "POSTER";
 my $scriptpath = dirname(rel2abs($0));
 my $tvdblanguage = "en";
 my $tvdb;
+my $forceeptitle = ""; # HACK for limitation in TVDB API module
 
 out("std", "SortTV\n", "~" x 6,"\n");
 get_config_from_file("$scriptpath/sorttv.conf");
@@ -100,10 +101,10 @@ sort_directory($sortdir);
 
 if($xbmcwebserver && $newshows) {
 	sleep(4);
-        # update xbmc video library
-		get "http://$xbmcwebserver/xbmcCmds/xbmcHttp?command=ExecBuiltIn(updatelibrary(video))";
-		# notification of update
-        get "http://$xbmcwebserver/xbmcCmds/xbmcHttp?command=ExecBuiltIn(Notification(,NEW EPISODES NOW AVAILABLE TO WATCH\nUpdating Library, 7000))";
+	# update xbmc video library
+	get "http://$xbmcwebserver/xbmcCmds/xbmcHttp?command=ExecBuiltIn(updatelibrary(video))";
+	# notification of update
+	get "http://$xbmcwebserver/xbmcCmds/xbmcHttp?command=ExecBuiltIn(Notification(,NEW EPISODES NOW AVAILABLE TO WATCH\n$newshows, 7000))";
 }
 
 $log->close if(defined $log);
@@ -157,13 +158,12 @@ sub sort_directory {
 						redo FILE;
 					}
 				} else {
-					rename_episode($pureshowname, $showname, $series, $episode, $file);
+					rename_episode($pureshowname, $series, $episode, $file);
 				}
-			}			
-		# match "Show - Episode title.avi" or "Show - AirDate.avi"
+			}
+		# match "Show - Episode title.avi" or "Show - [AirDate].avi"
 		} elsif($lookupseasonep eq "TRUE" && (filename($file) =~ /(.*)(?:\.|\s)(\d{4}[-.]\d{1,2}[-.]\d{1,2}).*/
-		|| filename($file) =~ /(.*)-(.*)(?:\..*)/)) { 
-			
+		|| filename($file) =~ /(.*)-(.*)(?:\..*)/)) {
 			$pureshowname = $1;
 			$showname = fixtitle($pureshowname);
 			my $episodetitle = fixdate($2);
@@ -184,7 +184,7 @@ sub sort_directory {
 						redo FILE;
 					}
 				} else {
-					rename_episode($pureshowname, $showname, $series, $episode, $file);
+					rename_episode($pureshowname, $series, $episode, $file);
 				}
 			} else {
 				#if we can't find a matching show and episode we assume this is not an episode file
@@ -207,7 +207,6 @@ sub sort_directory {
 		}
 	}
 }
-
 
 sub process_args {
 	foreach my $arg (@_) {
@@ -257,7 +256,7 @@ sub process_args {
 			$sortby = $1;
 		} elsif($arg =~ /^--season-double-digits:(.*)/ || $arg =~ /^-sd:(.*)/) {
 			$seasondoubledigit = $1;
-		} elsif($arg =~ /^--match-files-named-showname-episodetitle:(.*)/ || $arg =~ /^-lse:(.*)/) {
+		} elsif($arg =~ /^--match-files-based-on-tvdb-lookups:(.*)/ || $arg =~ /^-tlookup:(.*)/) {
 			$lookupseasonep = $1;
 		} elsif($arg =~ /^--verbose:(.*)/ || $arg =~ /^-v:(.*)/) {
 			$verbose = $1;
@@ -421,9 +420,10 @@ OPTIONS:
 	LIBERAL assumes all files are episodes and tries to extract season and episode number any way possible.
 	If not specified, NORMAL
 
---match-files-named-showname-episodetitle:[TRUE|FALSE]
-	Attempt to sort files that are named after the show and episode title.
-	For example, "My show - My episode title.avi" could become "My Show - S01E01 - My episode title.avi"
+--match-files-based-on-tvdb-lookups:[TRUE|FALSE]
+	Attempt to sort files that are named after the episode title or air date.
+	For example, "My show - My episode title.avi" or "My show - 2010-12-12.avi"
+	 could become "My Show - S01E01 - My episode title.avi"
 	Attempts to lookup the season and episode number based on the episodes in thetvdb.com database.
 	Since this involves downloading the list of episodes from the Internet, this will cause a slower sort.
 	If not specified, TRUE
@@ -491,7 +491,7 @@ OPTIONS:
 		Disables notifying xbmc
 		Disables tvdb title formatting
 		Disables fetching images
-		Disables looking up files named "Show - EpTitle.ext"
+		Disables looking up files named "Show - EpTitle.ext" or by airdate
 		Changes rename format (if applicable) to not include episode titles
 
 EXAMPLES:
@@ -552,7 +552,7 @@ sub fixdate {
 		my $month = sprintf("%02d", $2);
 		my $day = sprintf("%02d", $3);
 		return $1."-".$month."-".$day;
-	}else {
+	} else {
 		return fixtitle($title);
 	}
 }
@@ -642,13 +642,11 @@ sub display_info {
 }
 
 sub rename_episode {
-	my ($pureshowname, $showname, $series, $episode, $file) = @_;
+	my ($pureshowname, $series, $episode, $file) = @_;
 
 	out("verbose", "INFO: trying to rename $pureshowname season $series episode $episode\n");
-	SHOW: foreach my $show (bsd_glob($tvdir.'*')) {
-		# test if it matches a simple version, or a substituted version of the file to move
-		move_an_ep($file, path($file), path($file), $series, $episode);
-	}
+	# test if it matches a simple version, or a substituted version of the file to move
+	move_an_ep($file, path($file), path($file), $series, $episode);
 	return 0;
 }
 
@@ -760,7 +758,7 @@ sub fetchseasonep {
 				# pass back the Season Number and Episode Number in an array
 				return @seasonep;
 			}
-		}else {
+		} else {
 			my $season = 1;
 			# make sure you know what season to stop at
 			my $maxseasons = $tvdb->getMaxSeason($seriesall->{'SeriesName'});
@@ -834,13 +832,13 @@ sub move_an_ep {
 		if($renameformat =~ /\[EP_NAME(\d)]/i) {
 			out("verbose", "INFO: Fetching episode title for ", resolve_show_name($pureshowname), " Season $series Episode $episode.\n");
 			my $name;
-			# setConf maxEpisode apparently doesn't register, temporary fix 
+			# HACK - setConf maxEpisode apparently doesn't register, temporary fix
 			if(defined($forceeptitle)&& $forceeptitle ne "") {
 				# set it if you had to force a ep title
 				$name = $forceeptitle;
 				# forget so we can be fresh for the next file
 				$forceeptitle = "";	
-			}else {
+			} else {
 				$name = $tvdb->getEpisodeName(substitute_tvdb_id(resolve_show_name($pureshowname)), $series, $episode);
 			}
 			my $format = $1;
@@ -876,7 +874,8 @@ sub move_an_ep {
 	$newpath .= $newfilename;
 	if(-e $newpath) {
 		if(filename($file) =~ /repack|proper/i) {
-			out("warn", "OVERWRITE: Repack/proper version.\n");
+			# still overwrites if copying, but doesn't output a message unless verbose
+			out("warn", "OVERWRITE: Repack/proper version.\n") unless($verbose eq "FALSE" && ($sortby eq "COPY" || $sortby eq "PLACE-SYMLINK"));
 		} else {
 			out("warn", "SKIP: File $newpath already exists, skipping.\n") unless($sortby eq "COPY" || $sortby eq "PLACE-SYMLINK");
 			return;

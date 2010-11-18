@@ -164,13 +164,13 @@ OPTIONS:
 		LIBERAL assumes all files are episodes and tries to extract season and episode number any way possible.
 		If not specified, NORMAL
 
-	--match-files-named-showname-episodetitle:[TRUE|FALSE]
-		Attempt to sort files that are named after the show and episode title.
-		For example, "My show - My episode title.avi" could become "My Show - S01E01 - My episode title.avi"
+	--match-files-based-on-tvdb-lookups:[TRUE|FALSE]
+		Attempt to sort files that are named after the episode title or air date.
+		For example, "My show - My episode title.avi" or "My show - 2010-12-12.avi"
+		 could become "My Show - S01E01 - My episode title.avi"
 		Attempts to lookup the season and episode number based on the episodes in thetvdb.com database.
 		Since this involves downloading the list of episodes from the Internet, this will cause a slower sort.
-		If not specified, FALSE
-
+		If not specified, TRUE
 
 	--sort-by:[MOVE|COPY|MOVE-AND-LEAVE-SYMLINK-BEHIND|PLACE-SYMLINK]
 		Sort by moving or copying the file. If the file already exists because it was already copied it is silently skipped.
