@@ -821,6 +821,7 @@ sub move_an_ep {
 	my($file, $season, $show, $series, $episode) = @_;
 	my $newfilename = filename($file);
 	my $newpath;
+	my $sendxbmcnotifications = $xbmcwebserver;
 	
 	my $ep1 = sprintf("S%02dE%02d", $series, $episode);
 	if($rename eq "TRUE") {
@@ -875,13 +876,21 @@ sub move_an_ep {
 	if(-e $newpath) {
 		if(filename($file) =~ /repack|proper/i) {
 			# still overwrites if copying, but doesn't output a message unless verbose
-			out("warn", "OVERWRITE: Repack/proper version.\n") unless($verbose eq "FALSE" && ($sortby eq "COPY" || $sortby eq "PLACE-SYMLINK"));
+			if($verbose eq "TRUE" || ($sortby ne "COPY" && $sortby ne "PLACE-SYMLINK")) {
+				out("warn", "OVERWRITE: Repack/proper version.\n");
+				out("std", "$sortby: sorting $file to ", $newpath, "\n");
+			} else {
+				$sendxbmcnotifications = "";
+			}
 		} else {
-			out("warn", "SKIP: File $newpath already exists, skipping.\n") unless($sortby eq "COPY" || $sortby eq "PLACE-SYMLINK");
+			if($verbose eq "TRUE" || ($sortby ne "COPY" && $sortby ne "PLACE-SYMLINK")) {
+				out("warn", "SKIP: File $newpath already exists, skipping.\n");
+			}
 			return;
 		}
+	} else {
+		out("std", "$sortby: sorting $file to ", $newpath, "\n");
 	}
-	out("std", "$sortby: sorting $file to ", $newpath, "\n");
 	if($sortby eq "MOVE" || $sortby eq "MOVE-AND-LEAVE-SYMLINK-BEHIND") {
 		if(-d $file) {
 			dirmove($file, $newpath) or out("warn", "File $show cannot be moved to $season. : $!");
@@ -906,7 +915,7 @@ sub move_an_ep {
 		if ($fetchimages ne "FALSE") {
 			fetchepisodeimage(resolve_show_name($pureshowname), $show, $series, $season, $episode, $newfilename);
 		}
-		if($xbmcwebserver) {
+		if($sendxbmcnotifications) {
 			$new = resolve_show_name($pureshowname) . " $ep1";
 			get "http://$xbmcwebserver/xbmcCmds/xbmcHttp?command=ExecBuiltIn(Notification(NEW EPISODE, $new, 7000))";
 			$newshows .= "$new\n";
