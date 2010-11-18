@@ -46,7 +46,7 @@ use warnings;
 use strict;
 
 my ($sortdir, $tvdir, $nonepisodedir, $xbmcwebserver, $matchtype);
-my ($showname, $series, $episode, $pureshowname) = "";
+my ($showname, $series, $episode, $pureshowname, $forceeptitle) = "";
 my ($newshows, $new, $log);
 my (@showrenames, @showtvdbids);
 my $REDO_FILE = my $moveseasons = my $windowsnames = my $tvdbrename = my $lookupseasonep = "TRUE";
@@ -88,6 +88,8 @@ if($renameformat =~ /\[EP_NAME\d]/i || $fetchimages ne "FALSE"
 	$tvdb->setCacheDB("$scriptpath/.cache/.tvdb.db");
 	$tvdb->setUserAgent("SortTV");
 	$tvdb->setBannerPath("$scriptpath/.cache/");
+	# grab updates if over 6 hours old, for using rename only it's handy.
+	$tvdb->getUpdates('guess');
 }
 
 $log = FileHandle->new("$logfile", "a") or out("warn", "WARN: Could not open log file $logfile: $!\n") if $logfile;
@@ -98,7 +100,10 @@ sort_directory($sortdir);
 
 if($xbmcwebserver && $newshows) {
 	sleep(4);
-        get "http://$xbmcwebserver/xbmcCmds/xbmcHttp?command=ExecBuiltIn(Notification(,NEW EPISODES NOW AVAILABLE TO WATCH\n$newshows, 7000))";
+        # update xbmc video library
+		get "http://$xbmcwebserver/xbmcCmds/xbmcHttp?command=ExecBuiltIn(updatelibrary(video))";
+		# notification of update
+        get "http://$xbmcwebserver/xbmcCmds/xbmcHttp?command=ExecBuiltIn(Notification(,NEW EPISODES NOW AVAILABLE TO WATCH\nUpdating Library, 7000))";
 }
 
 $log->close if(defined $log);
@@ -133,9 +138,10 @@ sub sort_directory {
 			if(move_series($pureshowname, $showname, $series, $file) eq $REDO_FILE) {
 				redo FILE;
 			}
-		# Regex for tv show episode: S01E01 or 1x1 or 1 x 1 etc
+		# Regex for tv show episode: S01E01 or 1x1 or 1 x 1 or 101 etc
 		} elsif(filename($file) =~ /(.*)(?:\.|\s)[Ss]0*(\d+)\s*[Ee]0*(\d+).*/
 		|| filename($file) =~ /(.*)(?:\.|\s)0*(\d+)\s*[xX]\s*0*(\d+).*/
+		|| filename($file) =~ /(.*)(?:\.|\s)(\d)(\d{2})(?:\.|\s).*/
 		|| ($matchtype eq "LIBERAL" && filename($file) =~ /(.*)(?:\.|\s)0*(\d+)\D*0*(\d+).*/)) {
 			$pureshowname = $1;
 			$showname = fixtitle($pureshowname);
@@ -153,12 +159,14 @@ sub sort_directory {
 				} else {
 					rename_episode($pureshowname, $showname, $series, $episode, $file);
 				}
-			}
-		# match "Show - Episode title.avi"
-		} elsif($lookupseasonep eq "TRUE" && filename($file) =~ /(.*)-(.*)(?:\..*)/) {
+			}			
+		# match "Show - Episode title.avi" or "Show - AirDate.avi"
+		} elsif($lookupseasonep eq "TRUE" && (filename($file) =~ /(.*)(?:\.|\s)(\d{4}[-.]\d{1,2}[-.]\d{1,2}).*/
+		|| filename($file) =~ /(.*)-(.*)(?:\..*)/)) { 
+			
 			$pureshowname = $1;
 			$showname = fixtitle($pureshowname);
-			my $episodetitle = fixtitle($2);
+			my $episodetitle = fixdate($2);
 			$series = "";
 			$episode = "";
 			# calls fetchseasonep to try and find season and episode numbers: returns array [0] = Season [1] = Episode
@@ -521,17 +529,6 @@ END
 	exit;
 }
 
-sub displayandupdateinfo {
-	my ($show, $xbmcwebserver) = @_;
-
-	# update xbmc video library
-	get "http://$xbmcwebserver/xbmcCmds/xbmcHttp?command=ExecBuiltIn(updatelibrary(video))";
-
-	# pop up a notification on xbmc
-	# xbmc.executebuiltin('XBMC.Notification(New content found, ' + filename + ', 2000)')
-	get "http://$xbmcwebserver/xbmcCmds/xbmcHttp?command=ExecBuiltIn(Notification(NEW EPISODE, $show, 7000))";
-}
-
 # replaces ".", "_" and removes "the" and ","
 # removes numbers and spaces
 # removes the dir path
@@ -545,6 +542,19 @@ sub fixtitle {
 	$title = remdot($title);
 	$title =~ s/\d|\s|\(|\)//ig;
 	return $title;
+}
+
+# format a date to YYYY-MM-DD for air date look up
+# if not a date send it to fixtitle
+sub fixdate {
+	my ($title) = @_;
+	if($title =~ /(\d{4})[-.](\d{1,2})[-.](\d{1,2})/) {
+		my $month = sprintf("%02d", $2);
+		my $day = sprintf("%02d", $3);
+		return $1."-".$month."-".$day;
+	}else {
+		return fixtitle($title);
+	}
 }
 
 # substitutes show names as configured
@@ -730,42 +740,56 @@ sub fetchepisodeimage {
 	copy ("$scriptpath/.cache/$epimage", $newimagepath) if $epimage && -e "$scriptpath/.cache/$epimage";
 }
 
-# lookup episode details based on show name and episode title
+# lookup episode details based on show name and episode title or air date
 sub fetchseasonep {
 	my ($show, $eptitle) = @_;
 	# make sure we have all the series data in cache
 	my $seriesall = $tvdb->getSeries(resolve_show_name($show));
 	my @seasonep;
-	my $season = 1;
 	# get the show name from the hash
 	my $showtitle = $seriesall->{'SeriesName'};
-
 	if(defined $showtitle) {
-		# make sure you know what season to stop at
-		my $maxseasons = $tvdb->getMaxSeason($seriesall->{'SeriesName'});
-		# work through the seasons
-		while($season <= $maxseasons) {
-			my @epid = $tvdb->getSeason($showtitle, $season);
-			my $spot = 1;
-			# process each episode id
-			while($epid[0]) {
-				if(defined($epid[0][$spot])) {
-					my $epdetails = $tvdb->getEpisodeId($epid[0][$spot]);
-					if(defined($epdetails)) {
-						# compare the Episode to the one in the search
-						if(fixtitle($epdetails->{'EpisodeName'}) =~ /^\Q$eptitle\E$/) {
-							$seasonep[0] = $epdetails->{'SeasonNumber'};
-							$seasonep[1] = $epdetails->{'EpisodeNumber'};
-							# pass back the Season Number and Episode Number in an array
-							return @seasonep;
-						}
-					}
-					$spot++;
-				} else {
-					last;
-				}
+		if($eptitle =~ /\d{4}-\d{2}-\d{2}/){
+			# get episode details from show title and air date
+			my $epdetails = $tvdb->getEpisodeByAirDate($showtitle, $eptitle);
+			if(defined($epdetails)) {
+				$seasonep[0] = $epdetails->[0]->{'SeasonNumber'};
+				$seasonep[1] = $epdetails->[0]->{'EpisodeNumber'};
+				#temporary solution to episode number over 49
+				$forceeptitle = $epdetails->[0]->{'EpisodeName'} if $seasonep[1] >= 50;
+				# pass back the Season Number and Episode Number in an array
+				return @seasonep;
 			}
-			$season++;
+		}else {
+			my $season = 1;
+			# make sure you know what season to stop at
+			my $maxseasons = $tvdb->getMaxSeason($seriesall->{'SeriesName'});
+			# work through the seasons
+			while($season <= $maxseasons) {
+				my @epid = $tvdb->getSeason($showtitle, $season);
+				my $spot = 1;
+				# process each episode id
+				while($epid[0]) {
+					if(defined($epid[0][$spot])) {
+						my $epdetails = $tvdb->getEpisodeId($epid[0][$spot]);
+						if(defined($epdetails)) {
+							# compare the Episode to the one in the search
+							if(fixtitle($epdetails->{'EpisodeName'}) =~ /^\Q$eptitle\E$/) {
+								$seasonep[0] = $epdetails->{'SeasonNumber'};
+								$seasonep[1] = $epdetails->{'EpisodeNumber'};
+								#temporary solution to episode number over 49
+								$forceeptitle = $epdetails->{'EpisodeName'} if $seasonep[1] >= 50;
+								# pass back the Season Number and Episode Number in an array
+								return @seasonep;
+							}
+						}
+						$spot++;
+					} else {
+						last;
+					}
+				}
+				$season++;
+			}
 		}
 	} else {
 		out("std", "WARN: Failed to get " . $show . " series information on the tvdb.com.\n");
@@ -809,10 +833,23 @@ sub move_an_ep {
 		}
 		if($renameformat =~ /\[EP_NAME(\d)]/i) {
 			out("verbose", "INFO: Fetching episode title for ", resolve_show_name($pureshowname), " Season $series Episode $episode.\n");
-			my $name = $tvdb->getEpisodeName(substitute_tvdb_id(resolve_show_name($pureshowname)), $series, $episode);
+			my $name;
+			# setConf maxEpisode apparently doesn't register, temporary fix 
+			if(defined($forceeptitle)&& $forceeptitle ne "") {
+				# set it if you had to force a ep title
+				$name = $forceeptitle;
+				# forget so we can be fresh for the next file
+				$forceeptitle = "";	
+			}else {
+				$name = $tvdb->getEpisodeName(substitute_tvdb_id(resolve_show_name($pureshowname)), $series, $episode);
+			}
+			my $format = $1;
 			if($name) {
-				$eptitle = " - $name" if $1 == 1;
-				$eptitle = ".$name" if $1 == 2;
+				$name =~ s/\s+$//;		
+				# support for utf8 characters in episode names
+				require Encode;
+				$eptitle = " - " . Encode::decode_utf8($name) if $format == 1;
+				$eptitle = "." . Encode::decode_utf8($name) if $format == 2;
 			} else {
 				out("warn", "WARN: Could not get episode title for ", resolve_show_name($pureshowname), " Season $series Episode $episode.\n");
 			}
@@ -872,7 +909,7 @@ sub move_an_ep {
 		}
 		if($xbmcwebserver) {
 			$new = resolve_show_name($pureshowname) . " $ep1";
-			displayandupdateinfo($new, $xbmcwebserver);
+			get "http://$xbmcwebserver/xbmcCmds/xbmcHttp?command=ExecBuiltIn(Notification(NEW EPISODE, $new, 7000))";
 			$newshows .= "$new\n";
 		}
 	}
@@ -919,7 +956,7 @@ sub move_series {
 			move_a_season($file, $show, $series);
 			if($xbmcwebserver) {
 				$new = "$showname Season $series directory";
-				displayandupdateinfo($new, $xbmcwebserver);
+				get "http://$xbmcwebserver/xbmcCmds/xbmcHttp?command=ExecBuiltIn(Notification(NEW EPISODE, $new, 7000))";
 				$newshows .= "$new\n";
 			}
 			return 0;
