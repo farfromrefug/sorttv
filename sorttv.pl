@@ -89,8 +89,6 @@ if($renameformat =~ /\[EP_NAME\d]/i || $fetchimages ne "FALSE"
 	$tvdb->setCacheDB("$scriptpath/.cache/.tvdb.db");
 	$tvdb->setUserAgent("SortTV");
 	$tvdb->setBannerPath("$scriptpath/.cache/");
-	# grab updates if over 6 hours old, for using rename only it's handy.
-	$tvdb->getUpdates('guess');
 }
 
 $log = FileHandle->new("$logfile", "a") or out("warn", "WARN: Could not open log file $logfile: $!\n") if $logfile;
