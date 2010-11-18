@@ -953,7 +953,7 @@ sub out {
 		return if $verbose ne "TRUE";
 		print @msg;
 		print $log @msg if(defined $log);
-	}elsif($type eq "std") {
+	} elsif($type eq "std") {
 		print @msg;
 		print $log @msg if(defined $log);
 	} elsif($type eq "warn") {
