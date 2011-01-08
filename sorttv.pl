@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 
 # SortTV
-# Copyleft (ↄ) 2010
+# Copyleft (ↄ) 2010-2011
 # Z. Cliffe Schreuders
 #
 # Sorts tv shows into tvshow/series directories;
