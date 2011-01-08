@@ -41,6 +41,7 @@ use File::Spec::Functions "rel2abs";
 use File::Basename;
 use TVDB::API;
 use File::Find;
+use File::Path "make_path";
 use FileHandle;
 use warnings;
 use strict;
@@ -50,7 +51,7 @@ my ($showname, $series, $episode, $pureshowname) = "";
 my ($newshows, $new, $log);
 my (@showrenames, @showtvdbids);
 my $REDO_FILE = my $moveseasons = my $windowsnames = my $tvdbrename = my $lookupseasonep = "TRUE";
-my $usedots = my $rename = my $verbose = my $seasondoubledigit = my $removesymlinks = my $needshowexist = "FALSE";
+my $usedots = my $rename = my $verbose = my $seasondoubledigit = my $removesymlinks = my $needshowexist = my $flattennonepisodefiles = "FALSE";
 my $logfile = 0;
 my $seasontitle = "Season ";
 my $sortby = "MOVE";
@@ -138,8 +139,8 @@ sub sort_directory {
 				redo FILE;
 			}
 		# Regex for tv show episode: S01E01 or 1x1 or 1 x 1 or 101 etc
-		} elsif(filename($file) =~ /(.*)(?:\.|\s)[Ss]0*(\d+)\s*[Ee]0*(\d+).*/
-		|| filename($file) =~ /(.*)(?:\.|\s)0*(\d+)\s*[xX]\s*0*(\d+).*/
+		} elsif(filename($file) =~ /(.*)(?:\.|\s)[Ss]0*(\d+)\s*-?[Ee]0*(\d+).*/
+		|| filename($file) =~ /(.*)(?:\.|\s)0*(\d+)\s*[xX-]\s*0*(\d+).*/
 		|| filename($file) =~ /(.*)(?:\.|\s)(\d)(\d{2})(?:\.|\s).*/
 		|| ($matchtype eq "LIBERAL" && filename($file) =~ /(.*)(?:\.|\s)0*(\d+)\D*0*(\d+).*/)) {
 			$pureshowname = $1;
@@ -195,7 +196,17 @@ sub sort_directory {
 		if($nonep eq "TRUE" && defined $nonepisodedir && $tvdir ne "KEEP_IN_SAME_DIRECTORIES") {
 			my $newname = $file;
 			$newname =~ s/$sortdir//;
-			$newname = escape_myfilename($newname);
+			if($flattennonepisodefiles eq "TRUE") { # option
+				my $dirs = path($newname);
+				my $filename = filename($newname);
+				if(! -d $file && ! -e $dirs) {
+					# recursively creates the dir structure
+					make_path($nonepisodedir . $dirs);
+				}
+				$newname = $dirs . "/" . $filename;
+			} else { # flatten
+				$newname = escape_myfilename($newname);
+			}
 			out("std", "MOVING NON-EPISODE: $file to $nonepisodedir$newname\n");
 			if(-d $file) {
 				dirmove($file, $nonepisodedir . $newname) or out("warn", "WARN: File $file cannot be copied to $nonepisodedir. : $!");
@@ -219,6 +230,8 @@ sub process_args {
 		} elsif($arg =~ /^--xbmc-web-server:(.*)/ || $arg =~ /^-xs:(.*)/) {
 			$xbmcwebserver = $1;
 		} elsif($arg =~ /^--match-type:(.*)/ || $arg =~ /^-mt:(.*)/) {
+			$matchtype = $1;
+		} elsif($arg =~ /^--flatten-non-eps:(.*)/ || $arg =~ /^-fne:(.*)/) {
 			$matchtype = $1;
 		} elsif($arg =~ /^--treat-directories:(.*)/ || $arg =~ /^-td:(.*)/) {
 			$treatdir = $1;
@@ -471,6 +484,13 @@ OPTIONS:
 	Set language for thetvdb lookups, this effects episode titles etc
 	Valid values include: it, zh, es, hu, nl, pl, sl, da, de, el, he, sv, eng, fi, no, fr, ru, cs, en, ja, hr, tr, ko, pt
 	If not specified, en (English)
+
+--flatten-non-eps:[TRUE|FALSE]
+	Should non-episode files loose their directory structure?
+	This option only has an effect if a non-episode directory was specified.
+	If set to TRUE, they will be renamed after directory they were in.
+	Otherwise they keep their directory structure in the new non-episode-directory location.
+	If not specified, FALSE
 
 --fetch-images:[NEW_SHOWS|FALSE]
 	Download images for shows, seasons, and episodes from thetvdb

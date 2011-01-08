@@ -219,6 +219,13 @@ OPTIONS:
 		Valid values include: it, zh, es, hu, nl, pl, sl, da, de, el, he, sv, eng, fi, no, fr, ru, cs, en, ja, hr, tr, ko, pt
 		If not specified, en (English)
 
+	--flatten-non-eps:[TRUE|FALSE]
+		Should non-episode files loose their directory structure?
+		This option only has an effect if a non-episode directory was specified.
+		If set to TRUE, they will be renamed after directory they were in.
+		Otherwise they keep their directory structure in the new non-episode-directory location.
+		If not specified, FALSE
+
 	--fetch-images:[NEW_SHOWS|FALSE]
 		Download images for shows, seasons, and episodes from thetvdb
 		Downloaded images are copied into the sort-to (destination) directory.
