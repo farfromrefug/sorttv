@@ -55,6 +55,7 @@ my $usedots = my $rename = my $verbose = my $seasondoubledigit = my $removesymli
 my $logfile = 0;
 my $seasontitle = "Season ";
 my $sortby = "MOVE";
+my $ifexists = "SKIP";
 my $renameformat = "[SHOW_NAME] - [EP1][EP_NAME1]";
 my $treatdir = "RECURSIVELY_SORT_CONTENTS";
 my $fetchimages = "NEW_SHOWS";
@@ -111,9 +112,14 @@ exit;
 
 sub sort_directory {
 	my ($sortd) = @_;
+	# escape special characters from  bsd_glob
+	$sortd =~ s/(\[|]|\{|}|-|~)/\\\1/g;
 	FILE: foreach my $file (bsd_glob($sortd.'*')) {
 		$showname = "";
 		my $nonep = "FALSE";
+		my $dirsandfile = $file;
+		$dirsandfile =~ s/$sortdir//;
+		my $filename = filename($file);
 		# Regex for tv show season directory
 		if(-l $file) {
 			if($removesymlinks eq "TRUE") {
@@ -127,7 +133,7 @@ sub sort_directory {
 			sort_directory("$file/");
 			# removes any empty directories from the to-sort directory and sub-directories
 			finddepth(sub{rmdir},"$sortd");
-		} elsif(-d $file && $file =~ /.*\/(.*)(?:Season|Series|$seasontitle)\D?0*(\d+).*/i && $1) {
+		} elsif($treatdir eq "AS_FILES_TO_SORT" && -d $file && $file =~ /.*\/(.*)(?:Season|Series|$seasontitle)\D?0*(\d+).*/i && $1) {
 			$pureshowname = $1;
 			if($seasondoubledigit eq "TRUE") {
 				$series = sprintf("%02d", $2);
@@ -138,11 +144,14 @@ sub sort_directory {
 			if(move_series($pureshowname, $showname, $series, $file) eq $REDO_FILE) {
 				redo FILE;
 			}
-		# Regex for tv show episode: S01E01 or 1x1 or 1 x 1 or 101 etc
-		} elsif(filename($file) =~ /(.*)(?:\.|\s)[Ss]0*(\d+)\s*-?[Ee]0*(\d+).*/
-		|| filename($file) =~ /(.*)(?:\.|\s)0*(\d+)\s*[xX-]\s*0*(\d+).*/
-		|| filename($file) =~ /(.*)(?:\.|\s)(\d)(\d{2})(?:\.|\s).*/
-		|| ($matchtype eq "LIBERAL" && filename($file) =~ /(.*)(?:\.|\s)0*(\d+)\D*0*(\d+).*/)) {
+		# Regex for tv show episode: S01E01 or 1x1 or 1 x 1 or 101 or [1x1] etc
+		} elsif($filename =~ /(.*?)(?:\.|\s|-|_|\[)+[Ss]0*(\d+)(?:\.|\s|-|_)*[Ee]0*(\d+).*/
+		|| $filename =~ /(.*)(?:\.|\s|-|_)+\[?0*(\d+)\s*[xX-]\s*0*(\d+).*/
+		|| $filename =~ /(.*)(?:\.|\s|-|_)+0*(\d)(\d{2})(?:\.|\s).*/
+		# "Show/Season 1/1.avi" or "Show Season 1/101.avi" or "Show/Season 1/1x1.avi" or "Show Series 1 Episode 1.avi" etc
+		|| $dirsandfile =~ /(.*?)(?:\.|\s|\/|\\|-|\1)*(?:Season|Series|$seasontitle)\D?0*(\d+)(?:\.|\s|\/|\\|-|\1)+\[?0*\d+\s*[xX-]\s*0*(\d+).*/i
+		|| $dirsandfile =~ /(.*?)(?:\.|\s|\/|\\|-|\1)*(?:Season|Series|$seasontitle)\D?0*(\d+)(?:\.|\s|\/|\\|-|\1)+\d?(?:[ .-]*Episode[ .-]*)?0*(\d{1,2}).*/i
+		|| ($matchtype eq "LIBERAL" && filename($file) =~ /(.*)(?:\.|\s|-|_)0*(\d+)\D*0*(\d+).*/)) {
 			$pureshowname = $1;
 			$showname = fixtitle($pureshowname);
 			if($seasondoubledigit eq "TRUE") {
@@ -151,7 +160,7 @@ sub sort_directory {
 				$series = $2;
 			}
 			$episode = $3;
-			if($showname ne "") {
+			if($pureshowname ne "") {
 				if($tvdir !~ /^KEEP_IN_SAME_DIRECTORIES/) {
 					if(move_episode($pureshowname, $showname, $series, $episode, $file) eq $REDO_FILE) {
 						redo FILE;
@@ -161,7 +170,7 @@ sub sort_directory {
 				}
 			}
 		# match "Show - Episode title.avi" or "Show - [AirDate].avi"
-		} elsif($lookupseasonep eq "TRUE" && (filename($file) =~ /(.*)(?:\.|\s)(\d{4}[-.]\d{1,2}[-.]\d{1,2}).*/
+		} elsif( (($treatdir eq "AS_FILES_TO_SORT" && -d $file) || -f $file) && $lookupseasonep eq "TRUE" && (filename($file) =~ /(.*)(?:\.|\s)(\d{4}[-.]\d{1,2}[-.]\d{1,2}).*/
 		|| filename($file) =~ /(.*)-(.*)(?:\..*)/)) {
 			$pureshowname = $1;
 			$showname = fixtitle($pureshowname);
@@ -196,14 +205,14 @@ sub sort_directory {
 		if($nonep eq "TRUE" && defined $nonepisodedir && $tvdir ne "KEEP_IN_SAME_DIRECTORIES") {
 			my $newname = $file;
 			$newname =~ s/$sortdir//;
-			if($flattennonepisodefiles eq "TRUE") { # option
+			if($flattennonepisodefiles eq "FALSE") {
 				my $dirs = path($newname);
 				my $filename = filename($newname);
-				if(! -d $file && ! -e $dirs) {
+				if(! -d $file && ! -e $nonepisodedir . $dirs) {
 					# recursively creates the dir structure
 					make_path($nonepisodedir . $dirs);
 				}
-				$newname = $dirs . "/" . $filename;
+				$newname = $dirs . $filename;
 			} else { # flatten
 				$newname = escape_myfilename($newname);
 			}
@@ -235,6 +244,8 @@ sub process_args {
 			$matchtype = $1;
 		} elsif($arg =~ /^--treat-directories:(.*)/ || $arg =~ /^-td:(.*)/) {
 			$treatdir = $1;
+		} elsif($arg =~ /^--if-file-exists:(.*)/ || $arg =~ /^-e:(.*)/) {
+			$ifexists = $1;
 		} elsif($arg =~ /^--show-name-substitute:(.*-->.*)/ || $arg =~ /^-sub:(.*-->.*)/) {
 			push @showrenames, $1;
 		} elsif($arg =~ /^--tvdb-id-substitute:(.*-->.*)/ || $arg =~ /^-tis:(.*-->.*)/) {
@@ -392,7 +403,7 @@ OPTIONS:
 	If not specified, TRUE
 
 --rename-episodes:[TRUE|FALSE]
-	Rename episodes to "show name S01E01.ext" format when moving
+	Rename episodes to a new format when moving
 	If not specified, FALSE
 
 --rename-format:{formatstring}
@@ -504,6 +515,10 @@ OPTIONS:
 	POSTER/BANNER
 	if not specified, POSTER
 
+--if-file-exists:[SKIP|OVERWRITE]
+	What to do if a file already exists in the destination
+	If not specified, SKIP
+		
 --no-network
 	Disables all the network enabled features such as:
 		Disables notifying xbmc
@@ -554,8 +569,7 @@ sub fixtitle {
 	my ($title) = @_;
 	$title =~ s/,|\.the\.|\bthe\b//ig;
 	$title =~ s/\.and\.|\band\b//ig;
-	$title =~ s/&|\+//ig;
-	$title =~ s/'//ig;
+	$title =~ s/&|\+|'|_//ig;
 	$title =~ s/(.*\/)(.*)/$2/;
 	$title = remdot($title);
 	$title =~ s/\d|\s|\(|\)//ig;
@@ -637,8 +651,11 @@ sub filename {
 # removes filename
 sub path {
 	my ($title) = @_;
-	$title =~ s/(.*\/)(.*)/$1/;
-	return $title;
+	if($title =~ s/(.*)(?:\/|\\)(.*)/$1/) {
+		return $title."/";
+	} else {
+		return "";
+	}
 }
 
 sub escape_myfilename {
@@ -674,7 +691,7 @@ sub move_episode {
 	out("verbose", "INFO: trying to move $pureshowname season $series episode $episode\n");
 	SHOW: foreach my $show (bsd_glob($tvdir.'*')) {
 		# test if it matches a simple version, or a substituted version of the file to move
-		my $subshowname = fixtitle(escape_myfilename(resolve_show_name($showname)));
+		my $subshowname = fixtitle(escape_myfilename(resolve_show_name($pureshowname)));
 		if(fixtitle(filename($show)) =~ /^\Q$showname\E$/i || fixtitle(escape_myfilename(filename($show))) =~ /^\Q$subshowname\E$/i) {
 			out("verbose", "INFO: found a matching show:\n\t$show\n");
 			my $s = $show.'/*';
@@ -817,6 +834,10 @@ sub fetchseasonep {
 # returns the title with the format from thetvdb.com, or if not found the original string
 sub tvdb_title {
 	my ($filetitle) = @_;
+	# if the show name is only special chars then leave as is
+	if (!$filetitle) {
+		$filetitle = $pureshowname;
+	}
 	if($tvdbrename eq "TRUE") {
 		my $id_sub = substitute_tvdb_id($filetitle);
 		if($id_sub =~ /^[+-]?\d+$/) {
@@ -900,7 +921,10 @@ sub move_an_ep {
 			} else {
 				$sendxbmcnotifications = "";
 			}
-		} else {
+		} elsif($ifexists eq "OVERWRITE") {
+			out("warn", "OVERWRITE: Existing file.\n");
+			out("std", "$sortby: sorting $file to ", $newpath, "\n");
+		} elsif($ifexists eq "SKIP") {
 			if($verbose eq "TRUE" || ($sortby ne "COPY" && $sortby ne "PLACE-SYMLINK")) {
 				out("warn", "SKIP: File $newpath already exists, skipping.\n");
 			}

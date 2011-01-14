@@ -238,6 +238,10 @@ OPTIONS:
 		POSTER/BANNER
 		if not specified, POSTER
 
+	--if-file-exists:[SKIP|OVERWRITE]
+		What to do if a file already exists in the destination
+		If not specified, SKIP
+			
 	--no-network
 		Disables all the network enabled features such as:
 			Disables notifying xbmc
