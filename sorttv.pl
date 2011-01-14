@@ -113,7 +113,7 @@ exit;
 sub sort_directory {
 	my ($sortd) = @_;
 	# escape special characters from  bsd_glob
-	$sortd =~ s/(\[|]|\{|}|-|~)/\\\1/g;
+	$sortd =~ s/(\[|]|\{|}|-|~)/\\$1/g;
 	FILE: foreach my $file (bsd_glob($sortd.'*')) {
 		$showname = "";
 		my $nonep = "FALSE";
