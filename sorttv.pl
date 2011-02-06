@@ -261,6 +261,9 @@ sub process_args {
 			$tvdblanguage = $1;
 		} elsif($arg =~ /^--fetch-images:(.*)/ || $arg =~ /^-fi:(.*)/) {
 			$fetchimages = $1;
+			if($^O =~ /MSWin/ && $fetchimages eq "TRUE") {
+				out("warn", "WARN: The Windows version of the TVDB API module does not support image downloads.\nRECOMMENDATION: edit your config file to disable this feature.\n");
+			}
 		} elsif($arg =~ /^--images-format:(.*)/ || $arg =~ /^-if:(.*)/) {
 			$imagesformat = $1;
 		} elsif($arg =~ /^--require-show-directories-already-exist:(.*)/ || $arg =~ /^-rs:(.*)/) {
