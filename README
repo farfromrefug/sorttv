@@ -251,7 +251,12 @@ OPTIONS:
 	--if-file-exists:[SKIP|OVERWRITE]
 		What to do if a file already exists in the destination
 		If not specified, SKIP
-			
+
+	--extract-compressed-before-sorting:[TRUE|FALSE]
+		Extracts the contents of archives (.zip, .rar) into the directory-to-sort while sorting
+		If "rar" and "unzip" programs are available they are used.
+		If not specified, TRUE
+
 	--no-network
 		Disables all the network enabled features such as:
 			Disables notifying xbmc

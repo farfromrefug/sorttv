@@ -50,7 +50,7 @@ my ($sortdir, $tvdir, $nonepisodedir, $xbmcwebserver, $matchtype);
 my ($showname, $series, $episode, $pureshowname) = "";
 my ($newshows, $new, $log);
 my (@showrenames, @showtvdbids, @whitelist, @blacklist);
-my $REDO_FILE = my $moveseasons = my $windowsnames = my $tvdbrename = my $lookupseasonep = "TRUE";
+my $REDO_FILE = my $moveseasons = my $windowsnames = my $tvdbrename = my $lookupseasonep = my $extractrar = "TRUE";
 my $usedots = my $rename = my $verbose = my $seasondoubledigit = my $removesymlinks = my $needshowexist = my $flattennonepisodefiles = "FALSE";
 my $logfile = 0;
 my $seasontitle = "Season ";
@@ -116,6 +116,11 @@ sub sort_directory {
 	# escape special characters from  bsd_glob
 	my $escapedsortd = $sortd;
 	$escapedsortd =~ s/(\[|]|\{|}|-|~)/\\$1/g;
+
+	if($extractrar eq "TRUE") {
+		extract_archives($escapedsortd, $sortd);
+	}
+
 	FILE: foreach my $file (bsd_glob($escapedsortd.'*')) {
 		$showname = "";
 		my $nonep = "FALSE";
@@ -254,6 +259,8 @@ sub process_args {
 			$treatdir = $1;
 		} elsif($arg =~ /^--if-file-exists:(.*)/ || $arg =~ /^-e:(.*)/) {
 			$ifexists = $1;
+		} elsif($arg =~ /^--extract-compressed-before-sorting:(.*)/ || $arg =~ /^-rar:(.*)/) {
+			$extractrar = $1;
 		} elsif($arg =~ /^--show-name-substitute:(.*-->.*)/ || $arg =~ /^-sub:(.*-->.*)/) {
 			push @showrenames, $1;
 		} elsif($arg =~ /^--whitelist:(.*)/ || $arg =~ /^-white:(.*)/) {
@@ -559,7 +566,12 @@ OPTIONS:
 --if-file-exists:[SKIP|OVERWRITE]
 	What to do if a file already exists in the destination
 	If not specified, SKIP
-		
+
+--extract-compressed-before-sorting:[TRUE|FALSE]
+	Extracts the contents of archives (.zip, .rar) into the directory-to-sort while sorting
+	If "rar" and "unzip" programs are available they are used.
+	If not specified, TRUE
+
 --no-network
 	Disables all the network enabled features such as:
 		Disables notifying xbmc
@@ -745,6 +757,26 @@ sub check_lists {
 		}
 	}
 	return "OK";
+}
+
+# extract .rar, .zip files
+sub extract_archives {
+	my ($escapedsortd, $sortd) = @_;
+	foreach my $arfile (bsd_glob($escapedsortd.'*.{rar,zip}')) {
+		if($arfile =~ /.*\.rar$/) {
+			if($ifexists eq "OVERWRITE") {
+				print "RAR:" . `rar e -o+ "$arfile" "$sortd"`;
+			} else {
+				print "RAR:" . `rar e -o- "$arfile" "$sortd"`;
+			}
+		} elsif($arfile =~ /.*\.zip$/) {
+			if($ifexists eq "OVERWRITE") {
+				print "ZIP:" . `unzip -o "$arfile" -d "$sortd"`;
+			} else {
+				print "ZIP:" . `unzip -n "$arfile" -d "$sortd"`;
+			}
+		}
+	}
 }
 
 sub display_info {
