@@ -184,8 +184,8 @@ sub sort_directory {
 				$episode = $foundseasonep[1];
 			}
 			if($series ne "" && $episode ne "") {
-				if($seasondoubledigit eq "TRUE") {
-					$series = sprintf("%02d", $2);
+				if($seasondoubledigit eq "TRUE" && $series ~= /\d+/) {
+					$series = sprintf("%02d", $series);
 				}
 				if($tvdir !~ /^KEEP_IN_SAME_DIRECTORIES/) {
 					if(move_episode($pureshowname, $showname, $series, $episode, $file) eq $REDO_FILE) {
