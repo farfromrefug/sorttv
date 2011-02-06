@@ -49,7 +49,7 @@ use strict;
 my ($sortdir, $tvdir, $nonepisodedir, $xbmcwebserver, $matchtype);
 my ($showname, $series, $episode, $pureshowname) = "";
 my ($newshows, $new, $log);
-my (@showrenames, @showtvdbids);
+my (@showrenames, @showtvdbids, @whitelist, @blacklist);
 my $REDO_FILE = my $moveseasons = my $windowsnames = my $tvdbrename = my $lookupseasonep = "TRUE";
 my $usedots = my $rename = my $verbose = my $seasondoubledigit = my $removesymlinks = my $needshowexist = my $flattennonepisodefiles = "FALSE";
 my $logfile = 0;
@@ -110,6 +110,7 @@ if($xbmcwebserver && $newshows) {
 $log->close if(defined $log);
 exit;
 
+
 sub sort_directory {
 	my ($sortd) = @_;
 	# escape special characters from  bsd_glob
@@ -121,7 +122,12 @@ sub sort_directory {
 		my $dirsandfile = $file;
 		$dirsandfile =~ s/\Q$sortdir\E//;
 		my $filename = filename($file);
-		# Regex for tv show season directory
+
+		# check white and black lists
+		if(check_lists($file) eq "NEXT") {
+			next FILE;
+		}
+
 		if(-l $file) {
 			if($removesymlinks eq "TRUE") {
 				out("std", "DELETE: Removing symlink: $file\n");
@@ -134,6 +140,7 @@ sub sort_directory {
 			sort_directory("$file/");
 			# removes any empty directories from the to-sort directory and sub-directories
 			finddepth(sub{rmdir},"$sortd");
+		# Regex for tv show season directory
 		} elsif($treatdir eq "AS_FILES_TO_SORT" && -d $file && $file =~ /.*\/(.*)(?:Season|Series|$seasontitle)\D?0*(\d+).*/i && $1) {
 			$pureshowname = $1;
 			if($seasondoubledigit eq "TRUE") {
@@ -249,6 +256,14 @@ sub process_args {
 			$ifexists = $1;
 		} elsif($arg =~ /^--show-name-substitute:(.*-->.*)/ || $arg =~ /^-sub:(.*-->.*)/) {
 			push @showrenames, $1;
+		} elsif($arg =~ /^--whitelist:(.*)/ || $arg =~ /^-white:(.*)/) {
+			my $glob = $1;
+			# puts the shell pattern in as a regex
+			push @whitelist, glob2pat($glob);
+		} elsif($arg =~ /^--blacklist:(.*)/ || $arg =~ /^-black:(.*)/) {
+			my $glob = $1;
+			# puts the shell pattern in as a regex
+			push @blacklist, glob2pat($glob);
 		} elsif($arg =~ /^--tvdb-id-substitute:(.*-->.*)/ || $arg =~ /^-tis:(.*-->.*)/) {
 			push @showtvdbids, $1;
 		} elsif($arg =~ /^--log-file:(.*)/ || $arg =~ /^-o:(.*)/) {
@@ -396,6 +411,16 @@ OPTIONS:
 	Where to put things that are not episodes
 	If this is supplied then files and directories that SortTV does not believe are episodes will be moved here
 	If not specified, non-episodes are not moved
+
+--whitelist:pattern
+	Only copy if the file matches one of these patterns
+	Uses shell-like simple pattern matches (eg *.avi)
+	This argument can be repeated to add more rules
+
+--blacklist:pattern
+	Don't copy if the file matches one of these patterns
+	Uses shell-like simple pattern matches (eg *.avi)
+	This argument can be repeated to add more rules
 
 --xbmc-web-server:host:port
 	host:port for xbmc webserver, to automatically update library when new episodes arrive
@@ -682,6 +707,44 @@ sub escape_myfilename {
 		$name =~ s/[\\\/\"<>|]/-/g;
 	}
 	return $name;
+}
+
+# turns a simple wildcard pattern into a regex
+# this is from the Perl Cookbook
+sub glob2pat {
+	my $globstr = shift;
+	my %patmap = (
+		'*' => '.*',
+		'?' => '.',
+		'[' => '[',
+		']' => ']',);
+	$globstr =~ s{(.)} { $patmap{$1} || "\Q$1" }ge;
+	return '^' . $globstr . '$';
+}
+
+# checks white and black list
+# returns "OK" or "NEXT"
+sub check_lists {
+	my ($file) = @_;
+	# check whitelist, skip if doesn't match one
+	my $found = "FALSE";
+	foreach my $white (@whitelist) {
+		if($file =~ /$white/) {
+			$found = "TRUE";
+		}
+	}
+	if($found eq "FALSE" && scalar(@whitelist)) {
+		out("std", "SKIP: Doesn't match whitelist: $file\n");
+		return "NEXT";
+	}
+	# check blacklist, skip if it matches any
+	foreach my $black (@blacklist) {
+		if($file =~ /$black/) {
+			out("std", "SKIP: Matches blacklist: $file\n");
+			return "NEXT";
+		}
+	}
+	return "OK";
 }
 
 sub display_info {
@@ -975,7 +1038,11 @@ sub move_an_ep {
 		}
 		if($sendxbmcnotifications) {
 			$new = resolve_show_name($pureshowname) . " $ep1";
-			get "http://$xbmcwebserver/xbmcCmds/xbmcHttp?command=ExecBuiltIn(Notification(NEW EPISODE, $new, 7000))";
+			my $retval = get "http://$xbmcwebserver/xbmcCmds/xbmcHttp?command=ExecBuiltIn(Notification(NEW EPISODE, $new, 7000))";
+			if($retval == undef) {
+				out("warn", "WARN: Could not connect to xbmc webserver.\nRECOMMENDATION: If you do not use this feature you should disable it in the configuration file.");
+				$xbmcwebserver = "";
+			}
 			$newshows .= "$new\n";
 		}
 	}

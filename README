@@ -103,6 +103,16 @@ OPTIONS:
 		If this is supplied then files and directories that SortTV does not believe are episodes will be moved here
 		If not specified, non-episodes are not moved
 
+	--whitelist:pattern
+		Only copy if the file matches one of these patterns
+		Uses shell-like simple pattern matches (eg *.avi)
+		This argument can be repeated to add more rules
+
+	--blacklist:pattern
+		Don't copy if the file matches one of these patterns
+		Uses shell-like simple pattern matches (eg *.avi)
+		This argument can be repeated to add more rules
+
 	--xbmc-web-server:host:port
 		host:port for xbmc webserver, to automatically update library when new episodes arrive
 		Remember to enable the webserver within xbmc, and "set the content" of your TV directory in xbmc.
