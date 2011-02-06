@@ -113,12 +113,13 @@ exit;
 sub sort_directory {
 	my ($sortd) = @_;
 	# escape special characters from  bsd_glob
-	$sortd =~ s/(\[|]|\{|}|-|~)/\\$1/g;
-	FILE: foreach my $file (bsd_glob($sortd.'*')) {
+	my $escapedsortd = $sortd;
+	$escapedsortd =~ s/(\[|]|\{|}|-|~)/\\$1/g;
+	FILE: foreach my $file (bsd_glob($escapedsortd.'*')) {
 		$showname = "";
 		my $nonep = "FALSE";
 		my $dirsandfile = $file;
-		$dirsandfile =~ s/$sortdir//;
+		$dirsandfile =~ s/\Q$sortdir\E//;
 		my $filename = filename($file);
 		# Regex for tv show season directory
 		if(-l $file) {
@@ -149,8 +150,8 @@ sub sort_directory {
 		|| $filename =~ /(.*)(?:\.|\s|-|_)+\[?0*(\d+)\s*[xX-]\s*0*(\d+).*/
 		|| $filename =~ /(.*)(?:\.|\s|-|_)+0*(\d)(\d{2})(?:\.|\s).*/
 		# "Show/Season 1/1.avi" or "Show Season 1/101.avi" or "Show/Season 1/1x1.avi" or "Show Series 1 Episode 1.avi" etc
-		|| $dirsandfile =~ /(.*?)(?:\.|\s|\/|\\|-|\1)*(?:Season|Series|$seasontitle)\D?0*(\d+)(?:\.|\s|\/|\\|-|\1)+\[?0*\d+\s*[xX-]\s*0*(\d+).*/i
-		|| $dirsandfile =~ /(.*?)(?:\.|\s|\/|\\|-|\1)*(?:Season|Series|$seasontitle)\D?0*(\d+)(?:\.|\s|\/|\\|-|\1)+\d?(?:[ .-]*Episode[ .-]*)?0*(\d{1,2}).*/i
+		|| $dirsandfile =~ /(.*?)(?:\.|\s|\/|\\|-|\1)*(?:Season|Series|\Q$seasontitle\E)\D?0*(\d+)(?:\.|\s|\/|\\|-|\1)+\[?0*\d+\s*[xX-]\s*0*(\d+).*/i
+		|| $dirsandfile =~ /(.*?)(?:\.|\s|\/|\\|-|\1)*(?:Season|Series|\Q$seasontitle\E)\D?0*(\d+)(?:\.|\s|\/|\\|-|\1)+\d?(?:[ .-]*Episode[ .-]*)?0*(\d{1,2}).*/i
 		|| ($matchtype eq "LIBERAL" && filename($file) =~ /(.*)(?:\.|\s|-|_)0*(\d+)\D*0*(\d+).*/)) {
 			$pureshowname = $1;
 			$showname = fixtitle($pureshowname);
@@ -184,7 +185,7 @@ sub sort_directory {
 				$episode = $foundseasonep[1];
 			}
 			if($series ne "" && $episode ne "") {
-				if($seasondoubledigit eq "TRUE" && $series ~= /\d+/) {
+				if($seasondoubledigit eq "TRUE" && $series =~ /\d+/) {
 					$series = sprintf("%02d", $series);
 				}
 				if($tvdir !~ /^KEEP_IN_SAME_DIRECTORIES/) {
@@ -204,7 +205,7 @@ sub sort_directory {
 		# move non-episodes
 		if($nonep eq "TRUE" && defined $nonepisodedir && $tvdir ne "KEEP_IN_SAME_DIRECTORIES") {
 			my $newname = $file;
-			$newname =~ s/$sortdir//;
+			$newname =~ s/\Q$sortdir\E//;
 			if($flattennonepisodefiles eq "FALSE") {
 				my $dirs = path($newname);
 				my $filename = filename($newname);
@@ -289,19 +290,25 @@ sub process_args {
 		} elsif($arg =~ /^--read-config-file:(.*)/ || $arg =~ /^-conf:(.*)/) {
 			get_config_from_file($1);
 		} elsif($arg =~ /^--directory-to-sort:(.*)/ || $arg =~ /^-sort:(.*)/) {
-			if(-e $1) {
-				$sortdir = $1;
+			my $sortd = $1;
+			# use Unix slashes
+			$sortd =~ s/\\/\//g;
+			if(-e $sortd) {
+				$sortdir = $sortd;
 				# append a trailing / if it's not there
 				$sortdir .= '/' if($sortdir !~ /\/$/);
 			} else {
 				out("warn", "WARN: Directory to sort does not exist ($1)\n");
 			}
 		} elsif($arg =~ /^--directory-to-sort-into:(.*)/ || $arg =~ /^-sortto:(.*)/) {
-			if($1 eq "KEEP_IN_SAME_DIRECTORIES") {
+			my $sortt = $1;
+			# use Unix slashes
+			$sortt =~ s/\\/\//g;
+			if($sortt eq "KEEP_IN_SAME_DIRECTORIES") {
 				$nonepisodedir = "";
 				$tvdir = "KEEP_IN_SAME_DIRECTORIES";
-			} elsif(-e $1) {
-				$tvdir = $1;
+			} elsif(-e $sortt) {
+				$tvdir = $sortt;
 				# append a trailing / if it's not there
 				$tvdir .= '/' if($tvdir !~ /\/$/);
 			} else {
@@ -310,19 +317,25 @@ sub process_args {
 		} elsif($arg eq "--help" || $arg eq "-h") {
 			showhelp();
 		} elsif(!defined($sortdir)) {
-			if(-e $arg) {
-				$sortdir = $arg;
+			my $sortd = $arg;
+			# use Unix slashes
+			$sortd =~ s/\\/\//g;
+			if(-e $sortd) {
+				$sortdir = $sortd;
 				# append a trailing / if it's not there
 				$sortdir .= '/' if($sortdir !~ /\/$/);
 			} else {
 				out("warn", "WARN: Directory to sort does not exist ($arg)\n");
 			}
 		} elsif(!defined($tvdir)) {
-			if($arg eq "KEEP_IN_SAME_DIRECTORIES") {
+			my $sortt = $arg;
+			# use Unix slashes
+			$sortt =~ s/\\/\//g;
+			if($sortt eq "KEEP_IN_SAME_DIRECTORIES") {
 				$nonepisodedir = "";
 				$tvdir = "KEEP_IN_SAME_DIRECTORIES";
-			} elsif(-e $arg) {
-				$tvdir = $arg;
+			} elsif(-e $sortt) {
+				$tvdir = $sortt;
 				# append a trailing / if it's not there
 				$tvdir .= '/' if($tvdir !~ /\/$/);
 			} else {
