@@ -129,7 +129,7 @@ sub sort_directory {
 		my $filename = filename($file);
 
 		# check white and black lists
-		if(check_lists($file) eq "NEXT") {
+		if(check_lists(filename($file)) eq "NEXT") {
 			next FILE;
 		}
 
@@ -759,21 +759,71 @@ sub check_lists {
 	return "OK";
 }
 
+sub num_found_in_list {
+	my ($find, @list) = @_;
+	foreach (@list) {
+		if($find == $_) {
+			return "TRUE";
+		}
+	}
+	return "FALSE";
+}
+
 # extract .rar, .zip files
+# tries to use these programs: rar, unrar, unzip, 7zip
+# if 7zip is used it will always overwrite existing files
 sub extract_archives {
 	my ($escapedsortd, $sortd) = @_;
-	foreach my $arfile (bsd_glob($escapedsortd.'*.{rar,zip}')) {
+	my $over = "";
+	my @errors = (-1, 32512);
+	foreach my $arfile (bsd_glob($escapedsortd.'*.{rar,zip,7z,gz,bz2}')) {
 		if($arfile =~ /.*\.rar$/) {
 			if($ifexists eq "OVERWRITE") {
-				print "RAR:" . `rar e -o+ "$arfile" "$sortd"`;
+				$over = "+";
 			} else {
-				print "RAR:" . `rar e -o- "$arfile" "$sortd"`;
+				$over = "-";
+			}
+
+			if(num_found_in_list(system("rar e -o$over '$arfile' '$sortd'"), @errors) eq "FALSE") {
+				out("std", "RAR: extracting $arfile into $sortd\n");
+			} elsif(num_found_in_list(system("unrar e -o$over '$arfile' '$sortd'"), @errors) eq "FALSE") {
+				out("std", "UNRAR: extracting $arfile into $sortd\n");
+			} elsif(num_found_in_list(system("7z e -y '$arfile' -o'$sortd'"), @errors) eq "FALSE") {
+				out("std", "7ZIP: extracting $arfile into $sortd\n");
+			} elsif(num_found_in_list(system("7za e -y '$arfile' -o'$sortd'"), @errors) eq "FALSE") {
+				out("std", "7ZIP: extracting $arfile into $sortd\n");
+			} elsif(num_found_in_list(system("C:\\Program Files\\7-Zip\\7z.exe e -y '$arfile' -o'$sortd'"), @errors) eq "FALSE") {
+				out("std", "7ZIP: extracting $arfile into $sortd\n");
+			} else {
+				out("std", "WARN: the rar / 7zip program could not be found, not decompressing $arfile\n");
 			}
 		} elsif($arfile =~ /.*\.zip$/) {
 			if($ifexists eq "OVERWRITE") {
-				print "ZIP:" . `unzip -o "$arfile" -d "$sortd"`;
+				$over = "-o";
 			} else {
-				print "ZIP:" . `unzip -n "$arfile" -d "$sortd"`;
+				$over = "-n";
+			}
+
+			if(num_found_in_list(system("unzip $over '$arfile' -d '$sortd'"), @errors) eq "FALSE") {
+				out("std", "RAR: extracting $arfile into $sortd\n");
+			} elsif(num_found_in_list(system("7z e -y '$arfile' -o'$sortd'"), @errors) eq "FALSE") {
+				out("std", "7ZIP: extracting $arfile into $sortd\n");
+			} elsif(num_found_in_list(system("7za e -y '$arfile' -o'$sortd'"), @errors) eq "FALSE") {
+				out("std", "7ZIP: extracting $arfile into $sortd\n");
+			} elsif(num_found_in_list(system("C:\\Program Files\\7-Zip\\7z.exe e -y '$arfile' -o'$sortd'"), @errors) eq "FALSE") {
+				out("std", "7ZIP: extracting $arfile into $sortd\n");
+			} else {
+				out("std", "WARN: the unzip / 7zip program could not be found, not decompressing $arfile\n");
+			}
+		} elsif($arfile =~ /.*\.(?:7z|gz|bz2)$/) {
+			if(num_found_in_list(system("7z e -y '$arfile' -o'$sortd'"), @errors) eq "FALSE") {
+				out("std", "7ZIP: extracting $arfile into $sortd\n");
+			} elsif(num_found_in_list(system("7za e -y '$arfile' -o'$sortd'"), @errors) eq "FALSE") {
+				out("std", "7ZIP: extracting $arfile into $sortd\n");
+			} elsif(num_found_in_list(system("C:\\Program Files\\7-Zip\\7z.exe e -y '$arfile' -o'$sortd'"), @errors) eq "FALSE") {
+				out("std", "7ZIP: extracting $arfile into $sortd\n");
+			} else {
+				out("std", "WARN: the 7zip program could not be found, not decompressing $arfile\n");
 			}
 		}
 	}
