@@ -1121,7 +1121,7 @@ sub move_an_ep {
 		if($sendxbmcnotifications) {
 			$new = resolve_show_name($pureshowname) . " $ep1";
 			my $retval = get "http://$xbmcwebserver/xbmcCmds/xbmcHttp?command=ExecBuiltIn(Notification(NEW EPISODE, $new, 7000))";
-			if($retval == undef) {
+			if(undef($retval)) {
 				out("warn", "WARN: Could not connect to xbmc webserver.\nRECOMMENDATION: If you do not use this feature you should disable it in the configuration file.");
 				$xbmcwebserver = "";
 			}
