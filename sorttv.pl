@@ -1122,7 +1122,7 @@ sub move_an_ep {
 			$new = resolve_show_name($pureshowname) . " $ep1";
 			my $retval = get "http://$xbmcwebserver/xbmcCmds/xbmcHttp?command=ExecBuiltIn(Notification(NEW EPISODE, $new, 7000))";
 			if(undef($retval)) {
-				out("warn", "WARN: Could not connect to xbmc webserver.\nRECOMMENDATION: If you do not use this feature you should disable it in the configuration file.");
+				out("warn", "WARN: Could not connect to xbmc webserver.\nRECOMMENDATION: If you do not use this feature you should disable it in the configuration file.\n");
 				$xbmcwebserver = "";
 			}
 			$newshows .= "$new\n";
