@@ -49,7 +49,7 @@ use strict;
 my ($sortdir, $tvdir, $nonepisodedir, $xbmcwebserver, $matchtype);
 my ($showname, $series, $episode, $pureshowname) = "";
 my ($newshows, $new, $log);
-my (@showrenames, @showtvdbids, @whitelist, @blacklist);
+my (@showrenames, @showtvdbids, @whitelist, @blacklist, @sizerange);
 my $REDO_FILE = my $moveseasons = my $windowsnames = my $tvdbrename = my $lookupseasonep = my $extractrar = "TRUE";
 my $usedots = my $rename = my $verbose = my $seasondoubledigit = my $removesymlinks = my $needshowexist = my $flattennonepisodefiles = "FALSE";
 my $logfile = 0;
@@ -132,6 +132,10 @@ sub sort_directory {
 		if(check_lists(filename($file)) eq "NEXT") {
 			next FILE;
 		}
+
+               if (check_filesize($file) eq "NEXT") {
+                       next FILE;
+               }
 
 		if(-l $file) {
 			if($removesymlinks eq "TRUE") {
@@ -308,6 +312,8 @@ sub process_args {
 			$lookupseasonep = $1;
 		} elsif($arg =~ /^--verbose:(.*)/ || $arg =~ /^-v:(.*)/) {
 			$verbose = $1;
+               } elsif($arg =~ /^--filesize-range:(.*-.*)/ || $arg =~ /^-fsrange:(.*-.*)/) {
+                       push @sizerange, $1;
 		} elsif($arg =~ /^--no-network/ || $arg =~ /^-no-net/) {
 			$xbmcwebserver = "";
 			$tvdbrename = $fetchimages = $lookupseasonep = "FALSE";
@@ -428,6 +434,10 @@ OPTIONS:
 	Don't copy if the file matches one of these patterns
 	Uses shell-like simple pattern matches (eg *.avi)
 	This argument can be repeated to add more rules
+
+--filesize-range:pattern
+       Only copy files which fall within these filesize ranges.
+       Examples for the pattern include 345MB-355MB or 1.05GB-1.15GB
 
 --xbmc-web-server:host:port
 	host:port for xbmc webserver, to automatically update library when new episodes arrive
@@ -757,6 +767,56 @@ sub check_lists {
 		}
 	}
 	return "OK";
+}
+
+sub check_filesize {
+       my ($file) = @_;
+       my $filesize = (-s $file) / 1024 / 1024;
+       my $check_flag = 'FALSE';
+
+
+       # Needed to support recursively filled directories
+       if (-d $file) {
+               return "OK";
+       }
+
+       # Loop through the size ranges passed in via the config file
+       foreach my $size (@sizerange) {
+               if ($size =~ /(.*)-(.*)/) {
+                       # Extract the min & max values, can mix and match postfixes
+                       my $minfilesize = $1;
+                       my $maxfilesize = $2;
+                       $minfilesize =~ s/MB//;
+                       $maxfilesize =~ s/MB//;
+
+                       # Fix filesizes passed in to all MB
+                       if ($minfilesize =~ /(.*)GB/) {
+                               $minfilesize = $1 * 1024;
+                       }
+
+                       if ($maxfilesize =~ /(.*)GB/) {
+                               $maxfilesize = $1 * 1024;
+                       }
+
+                       # Check the actual filesize
+                       if (-f $file && ($minfilesize < $filesize && $filesize < $maxfilesize)) {
+                               return "OK";
+                       }
+
+                       # Use the flag to say we didn't find any match for the filesize
+                       $check_flag = 'TRUE';
+               }
+       }
+
+       if ($check_flag =~ "TRUE") {
+               # Skip the file as it didn't fall within a specified filesize range
+               my $filename = filename($file);
+               out("std", "SKIP: Doesn't fit the filesize requirements: $filename\n");
+               return "NEXT";
+       }
+
+       # Defaults to OK so the filesize options become OPTIONAL.
+       return "OK";
 }
 
 sub num_found_in_list {
