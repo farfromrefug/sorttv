@@ -14,6 +14,7 @@
 # salithus - xbmc forum
 # schmoko - xbmc forum
 # CoinTos - xbmc forum
+# Patrick Cole - z@amused.net
 # gardz - xbmc forum
 #
 # Please goto the xbmc forum to discuss SortTV:
@@ -43,6 +44,11 @@ use File::Basename;
 use TVDB::API;
 use File::Find;
 use File::Path "make_path";
+# OPTIONAL - Sort only files that are older than this number of days
+# A value of zero sorts everything
+# Useful if you rsync your media from a remote server. 
+sort-only-older-than-days:0
+
 use FileHandle;
 use warnings;
 use strict;
@@ -56,6 +62,7 @@ my $usedots = my $rename = my $verbose = my $seasondoubledigit = my $removesymli
 my $logfile = 0;
 my $seasontitle = "Season ";
 my $sortby = "MOVE";
+my $sortolderthandays = 0;
 my $ifexists = "SKIP";
 my $renameformat = "[SHOW_NAME] - [EP1][EP_NAME1]";
 my $treatdir = "RECURSIVELY_SORT_CONTENTS";
@@ -113,6 +120,9 @@ exit;
 
 
 sub sort_directory {
+	--sort-older-than-days:days
+		Only sort the file or directory if it is older than this number of days
+
 	my ($sortd) = @_;
 	# escape special characters from  bsd_glob
 	my $escapedsortd = $sortd;
@@ -135,6 +145,14 @@ sub sort_directory {
 		}
 
 		if (check_filesize($file) eq "NEXT") {
+			next FILE;
+		}
+		
+		# Check mtime against sortolderthandays
+		my ($dev,$ino,$mode,$nlink,$uid,$gid,$rdev,$size,
+			$atime,$mtime,$ctime,$blksize,$blocks) = stat($file);
+		if ($sortolderthandays > 0 and $mtime >= (time() - ($sortolderthandays * 24 * 60 * 60))) {
+			out("std", "SKIP: $file is newer than $sortolderthandays days old.\n");
 			next FILE;
 		}
 
@@ -307,6 +325,8 @@ sub process_args {
 			$seasontitle = $1;
 		} elsif($arg =~ /^--sort-by:(.*)/ || $arg =~ /^-by:(.*)/) {
 			$sortby = $1;
+		} elsif($arg =~ /^--sort-only-older-than-days:(\d+)/) {
+			$sortolderthandays = $1;
 		} elsif($arg =~ /^--season-double-digits:(.*)/ || $arg =~ /^-sd:(.*)/) {
 			$seasondoubledigit = $1;
 		} elsif($arg =~ /^--match-files-based-on-tvdb-lookups:(.*)/ || $arg =~ /^-tlookup:(.*)/) {
@@ -527,6 +547,9 @@ OPTIONS:
 	The MOVE-AND-LEAVE-SYMLINK-BEHIND option may be handy if you want to continue to seed after sorting, this leaves a symlink in place of the newly moved file.
 	PLACE-SYMLINK does not move the original file, but places a symlink in the sort-to directory (probably not what you want)
 	If not specified, MOVE
+
+--sort-only-older-than-days:[DAYS]
+	Sort only files or directories that are older than this number of days.  If not specified or zero, sort everything.
 
 --treat-directories:[AS_FILES_TO_SORT|RECURSIVELY_SORT_CONTENTS|IGNORE]
 	How to treat directories. 
