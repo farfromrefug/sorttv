@@ -14,8 +14,8 @@
 # salithus - xbmc forum
 # schmoko - xbmc forum
 # CoinTos - xbmc forum
-# Patrick Cole - z@amused.net
 # gardz - xbmc forum
+# Patrick Cole - z@amused.net
 #
 # Please goto the xbmc forum to discuss SortTV:
 # http://forum.xbmc.org/showthread.php?t=75949
@@ -24,7 +24,7 @@
 # http://sourceforge.net/projects/sorttv/files/
 # 
 # Cliffe's website:
-# http://schreuders.org/
+# http://z.cliffe.schreuders.org/
 # 
 # Please consider a $5 donation if you find this program helpful.
 # http://sourceforge.net/donate/index.php?group_id=330009
@@ -32,7 +32,7 @@
 # This program is free software: you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
 #  the Free Software Foundation, either version 3 of the License, or
-#  (at your option) any later version.# 
+#  (at your option) any later version.
 
 
 use File::Copy::Recursive "dirmove", "dircopy";
@@ -44,11 +44,6 @@ use File::Basename;
 use TVDB::API;
 use File::Find;
 use File::Path "make_path";
-# OPTIONAL - Sort only files that are older than this number of days
-# A value of zero sorts everything
-# Useful if you rsync your media from a remote server. 
-sort-only-older-than-days:0
-
 use FileHandle;
 use warnings;
 use strict;
@@ -120,9 +115,6 @@ exit;
 
 
 sub sort_directory {
-	--sort-older-than-days:days
-		Only sort the file or directory if it is older than this number of days
-
 	my ($sortd) = @_;
 	# escape special characters from  bsd_glob
 	my $escapedsortd = $sortd;
@@ -143,15 +135,12 @@ sub sort_directory {
 		if(check_lists(filename($file)) eq "NEXT") {
 			next FILE;
 		}
-
+		# check size
 		if (check_filesize($file) eq "NEXT") {
 			next FILE;
 		}
-		
-		# Check mtime against sortolderthandays
-		my ($dev,$ino,$mode,$nlink,$uid,$gid,$rdev,$size,
-			$atime,$mtime,$ctime,$blksize,$blocks) = stat($file);
-		if ($sortolderthandays > 0 and $mtime >= (time() - ($sortolderthandays * 24 * 60 * 60))) {
+		# check age
+		if ($sortolderthandays && -M $file < $sortolderthandays) {
 			out("std", "SKIP: $file is newer than $sortolderthandays days old.\n");
 			next FILE;
 		}
@@ -325,7 +314,7 @@ sub process_args {
 			$seasontitle = $1;
 		} elsif($arg =~ /^--sort-by:(.*)/ || $arg =~ /^-by:(.*)/) {
 			$sortby = $1;
-		} elsif($arg =~ /^--sort-only-older-than-days:(\d+)/) {
+		} elsif($arg =~ /^--sort-only-older-than-days:(\d+)/ || $arg =~ /^-age:(\d+)/) {
 			$sortolderthandays = $1;
 		} elsif($arg =~ /^--season-double-digits:(.*)/ || $arg =~ /^-sd:(.*)/) {
 			$seasondoubledigit = $1;
@@ -473,6 +462,10 @@ OPTIONS:
 	Only copy files which fall within these filesize ranges.
 	Examples for the pattern include 345MB-355MB or 1.05GB-1.15GB
 
+--sort-only-older-than-days:[DAYS]
+	Sort only files or directories that are older than this number of days.  
+	If not specified or zero, sort everything.
+
 --xbmc-web-server:host:port
 	host:port for xbmc webserver, to automatically update library when new episodes arrive
 	Remember to enable the webserver within xbmc, and "set the content" of your TV directory in xbmc.
@@ -547,9 +540,6 @@ OPTIONS:
 	The MOVE-AND-LEAVE-SYMLINK-BEHIND option may be handy if you want to continue to seed after sorting, this leaves a symlink in place of the newly moved file.
 	PLACE-SYMLINK does not move the original file, but places a symlink in the sort-to directory (probably not what you want)
 	If not specified, MOVE
-
---sort-only-older-than-days:[DAYS]
-	Sort only files or directories that are older than this number of days.  If not specified or zero, sort everything.
 
 --treat-directories:[AS_FILES_TO_SORT|RECURSIVELY_SORT_CONTENTS|IGNORE]
 	How to treat directories. 

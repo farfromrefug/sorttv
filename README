@@ -113,6 +113,14 @@ OPTIONS:
 		Uses shell-like simple pattern matches (eg *.avi)
 		This argument can be repeated to add more rules
 
+	--filesize-range:pattern
+		Only copy files which fall within these filesize ranges.
+		Examples for the pattern include 345MB-355MB or 1.05GB-1.15GB
+
+	--sort-only-older-than-days:number
+		Sort only files or directories that are older than this number of days. 
+		If not specified or zero, sorts everything.
+
 	--xbmc-web-server:host:port
 		host:port for xbmc webserver, to automatically update library when new episodes arrive
 		Remember to enable the webserver within xbmc, and "set the content" of your TV directory in xbmc.
