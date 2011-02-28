@@ -14,6 +14,7 @@
 # salithus - xbmc forum
 # schmoko - xbmc forum
 # CoinTos - xbmc forum
+# gardz - xbmc forum
 #
 # Please goto the xbmc forum to discuss SortTV:
 # http://forum.xbmc.org/showthread.php?t=75949
@@ -133,9 +134,9 @@ sub sort_directory {
 			next FILE;
 		}
 
-               if (check_filesize($file) eq "NEXT") {
-                       next FILE;
-               }
+		if (check_filesize($file) eq "NEXT") {
+			next FILE;
+		}
 
 		if(-l $file) {
 			if($removesymlinks eq "TRUE") {
@@ -312,8 +313,21 @@ sub process_args {
 			$lookupseasonep = $1;
 		} elsif($arg =~ /^--verbose:(.*)/ || $arg =~ /^-v:(.*)/) {
 			$verbose = $1;
-               } elsif($arg =~ /^--filesize-range:(.*-.*)/ || $arg =~ /^-fsrange:(.*-.*)/) {
-                       push @sizerange, $1;
+		} elsif($arg =~ /^--filesize-range:(.*)-(.*)/ || $arg =~ /^-fsrange:(.*)-(.*)/) {
+			# Extract the min & max values, can mix and match postfixes
+			my $minfilesize = $1;
+			my $maxfilesize = $2;
+			$minfilesize =~ s/MB//;
+			$maxfilesize =~ s/MB//;
+			# Fix filesizes passed in to all MB
+			if ($minfilesize =~ /(.*)GB/) {
+				$minfilesize = $1 * 1024;
+			}
+			if ($maxfilesize =~ /(.*)GB/) {
+				$maxfilesize = $1 * 1024;
+			}
+			# Save as MB range
+			push @sizerange, "$minfilesize-$maxfilesize";
 		} elsif($arg =~ /^--no-network/ || $arg =~ /^-no-net/) {
 			$xbmcwebserver = "";
 			$tvdbrename = $fetchimages = $lookupseasonep = "FALSE";
@@ -436,8 +450,8 @@ OPTIONS:
 	This argument can be repeated to add more rules
 
 --filesize-range:pattern
-       Only copy files which fall within these filesize ranges.
-       Examples for the pattern include 345MB-355MB or 1.05GB-1.15GB
+	Only copy files which fall within these filesize ranges.
+	Examples for the pattern include 345MB-355MB or 1.05GB-1.15GB
 
 --xbmc-web-server:host:port
 	host:port for xbmc webserver, to automatically update library when new episodes arrive
@@ -770,53 +784,31 @@ sub check_lists {
 }
 
 sub check_filesize {
-       my ($file) = @_;
-       my $filesize = (-s $file) / 1024 / 1024;
-       my $check_flag = 'FALSE';
+	my ($file) = @_;
+	my $filesize = (-s $file) / 1024 / 1024;
 
+	# only check size if configured, and it is a regular file
+	if (! -f $file || @sizerange == 0) {
+		return "OK";
+	}
 
-       # Needed to support recursively filled directories
-       if (-d $file) {
-               return "OK";
-       }
+	# Loop through the size ranges passed in via the config file
+	foreach my $size (@sizerange) {
+		if ($size =~ /(.*)-(.*)/) {
+			my $minfilesize = $1;
+			my $maxfilesize = $2;
 
-       # Loop through the size ranges passed in via the config file
-       foreach my $size (@sizerange) {
-               if ($size =~ /(.*)-(.*)/) {
-                       # Extract the min & max values, can mix and match postfixes
-                       my $minfilesize = $1;
-                       my $maxfilesize = $2;
-                       $minfilesize =~ s/MB//;
-                       $maxfilesize =~ s/MB//;
+			# Check the filesize
+			if ($minfilesize < $filesize && $filesize < $maxfilesize) {
+				return "OK";
+			}
+		}
+	}
 
-                       # Fix filesizes passed in to all MB
-                       if ($minfilesize =~ /(.*)GB/) {
-                               $minfilesize = $1 * 1024;
-                       }
-
-                       if ($maxfilesize =~ /(.*)GB/) {
-                               $maxfilesize = $1 * 1024;
-                       }
-
-                       # Check the actual filesize
-                       if (-f $file && ($minfilesize < $filesize && $filesize < $maxfilesize)) {
-                               return "OK";
-                       }
-
-                       # Use the flag to say we didn't find any match for the filesize
-                       $check_flag = 'TRUE';
-               }
-       }
-
-       if ($check_flag =~ "TRUE") {
-               # Skip the file as it didn't fall within a specified filesize range
-               my $filename = filename($file);
-               out("std", "SKIP: Doesn't fit the filesize requirements: $filename\n");
-               return "NEXT";
-       }
-
-       # Defaults to OK so the filesize options become OPTIONAL.
-       return "OK";
+	# Skip the file as it didn't fall within a specified filesize range
+	my $filename = filename($file);
+	out("std", "SKIP: Doesn't fit the filesize requirements: $filename\n");
+	return "NEXT";
 }
 
 sub num_found_in_list {
