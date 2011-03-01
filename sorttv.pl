@@ -47,6 +47,7 @@ use File::Path "make_path";
 use FileHandle;
 use warnings;
 use strict;
+use Fcntl ':flock';
 
 my ($sortdir, $tvdir, $nonepisodedir, $xbmcwebserver, $matchtype);
 my ($showname, $series, $episode, $pureshowname) = "";
@@ -69,6 +70,12 @@ my $tvdb;
 my $forceeptitle = ""; # HACK for limitation in TVDB API module
 
 out("std", "SortTV\n", "~" x 6,"\n");
+
+# ensure only one copy running at a time
+if(open SELF, "< $0") {
+	flock SELF, LOCK_EX | LOCK_NB  or die "SortTV is already running, exiting.\n";
+}
+
 get_config_from_file("$scriptpath/sorttv.conf");
 process_args(@ARGV);
 if(!defined($sortdir) || !defined($tvdir)) {
