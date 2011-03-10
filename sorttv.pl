@@ -61,6 +61,9 @@ my (%showrenames, %showtvdbids);
 my $REDO_FILE = my $moveseasons = my $windowsnames = my $tvdbrename = my $lookupseasonep = my $extractrar = "TRUE";
 my $usedots = my $rename = my $verbose = my $seasondoubledigit = my $removesymlinks = my $needshowexist = my $flattennonepisodefiles = "FALSE";
 my $logfile = 0;
+my $createundoscript = 0;
+my $undoscriptname = "undolastsort.pl";
+my $undoscript = 0;
 my $seasontitle = "Season ";
 my $sortby = "MOVE";
 my $sortolderthandays = 0;
@@ -187,6 +190,7 @@ GetOptions(@optionlist);
 #we stop the script and show the help if help or man option was used
 showhelp(1) if $help or $man;
 
+process_args(@ARGV);
 if(!defined($sortdir) || !defined($tvdir)) {
     out("warn", "Incorrect usage or configuration (missing sort or sort-to directories)\n");
     out("warn", "run 'perl sorttv.pl --help' for more information about how to use SortTV");
@@ -214,6 +218,20 @@ if($renameformat =~ /\[EP_NAME\d]/i || $fetchimages ne "FALSE"
 
 $log = FileHandle->new("$logfile", "a") or out("warn", "WARN: Could not open log file $logfile: $!\n") if $logfile;
 
+if ($createundoscript)
+{
+    unlink($undoscriptname);
+    if (copy("undoscript.pl.in", $undoscriptname))
+    {
+        $undoscript = FileHandle->new($undoscriptname, "a") or out("warn", "WARN: Could not open $undoscriptname for writing: $!\n");
+    }
+    else
+    { 
+        out("warn", "WARN: Could not create undo script $undoscriptname: $!\n");
+    }
+}
+
+
 display_info();
 
 sort_directory($sortdir);
@@ -227,6 +245,8 @@ if($xbmcwebserver && $newshows) {
 }
 
 $log->close if(defined $log);
+$undoscript->close if($undoscript);
+
 exit;
 
 
@@ -1141,6 +1161,9 @@ sub move_an_ep {
 	}
 	# if the episode was moved (or already existed)
 	if(-e $newpath) {
+	    
+        add_undo($sortby, $file, $newpath);
+	    
 		if ($fetchimages ne "FALSE") {
 			fetchepisodeimage(resolve_show_name($pureshowname), $show, $series, $season, $episode, $newfilename);
 		}
@@ -1154,6 +1177,27 @@ sub move_an_ep {
 			$newshows .= "$new\n";
 		}
 	}
+}
+
+sub add_undo {
+    #lets undo the operation that created $newpath
+    my($operation, $file, $newpath) = @_;
+    
+    return if (not $undoscript or not -e $newpath);
+    
+    print $undoscript "\nif (user_asked_for_undo(\"Do you want to undo action applied on $file ,\\n which created $file? (y/n)\")) {\n";
+    if($operation eq "MOVE" || $operation eq "MOVE-AND-LEAVE-SYMLINK-BEHIND") {
+        print $undoscript "rmove(\"$newpath\", \"$file\") or out(\"warn\", \"File $file cannot be moved to $newpath. : $!\");";
+    } elsif($operation eq "COPY") {
+        if(-d $newpath) {
+            print $undoscript "rmtree(\"$newpath\") or out(\"warn\", \"File $newpath cannot be deleted. : $!\");";
+        } else {
+            print $undoscript "unlink(\"$newpath\") or out(\"warn\", \"File $newpath cannot be deleted. : $!\");";
+        }
+    } elsif($operation eq "PLACE-SYMLINK") {
+            print $undoscript "unlink\"$newpath\") or out(\"warn\", \"File $newpath cannot be deleted. : $!\");";
+    }
+    print $undoscript "}\n";
 }
 
 sub move_a_season {
