@@ -98,6 +98,10 @@ OPTIONS:
 		This directory will contain the structure (Show)/(Seasons)/(episodes)
 		Alternatively set this to "KEEP_IN_SAME_DIRECTORIES" for a recursive renaming of files in directory-to-sort
 
+	--sort-music-to:dir
+		Where to sort music into
+		If not specified, music is not moved
+
 	--non-episode-dir:dir
 		Where to put things that are not episodes
 		If this is supplied then files and directories that SortTV does not believe are episodes will be moved here
@@ -226,6 +230,10 @@ OPTIONS:
 	--tvdb-id-substitute:NAME1-->ID
 		Use these thetvdb.com IDs to lookup these shows
 		This argument can be repeated to add multiple rules for substitution
+
+	--music-extension:extension
+		Define additional extensions for music files (SortTV knows a lot already)
+		This argument can be repeated to add multiple additional extensions
 
 	--force-windows-compatible-filenames:[TRUE|FALSE]
 		Forces MSWindows compatible file names, even when run on other platforms such as Linux

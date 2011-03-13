@@ -49,10 +49,11 @@ use warnings;
 use strict;
 use Fcntl ':flock';
 
-my ($sortdir, $tvdir, $nonepisodedir, $xbmcwebserver, $matchtype);
+my ($sortdir, $tvdir, $nonepisodedir, $xbmcwebserver, $matchtype, $musicdir);
 my ($showname, $series, $episode, $pureshowname) = "";
 my ($newshows, $new, $log);
 my (@showrenames, @showtvdbids, @whitelist, @blacklist, @sizerange);
+my @musicext = ("aac","aif","iff","m3u","mid","midi","mp3","mpa","ra","ram","wave","wav","wma","ogg","oga","ogx","spx","flac","m4a", "pls");
 my $REDO_FILE = my $moveseasons = my $windowsnames = my $tvdbrename = my $lookupseasonep = my $extractrar = "TRUE";
 my $usedots = my $rename = my $verbose = my $seasondoubledigit = my $removesymlinks = my $needshowexist = my $flattennonepisodefiles = "FALSE";
 my $logfile = 0;
@@ -164,6 +165,8 @@ sub sort_directory {
 			sort_directory("$file/");
 			# removes any empty directories from the to-sort directory and sub-directories
 			finddepth(sub{rmdir},"$sortd");
+		} elsif(-r $file && $musicdir && ismusic($filename) eq "TRUE") {
+			sort_other ("MUSIC", "$musicdir", $file);
 		# Regex for tv show season directory
 		} elsif($treatdir eq "AS_FILES_TO_SORT" && -d $file && $file =~ /.*\/(.*)(?:Season|Series|$seasontitle)\D?0*(\d+).*/i && $1) {
 			$pureshowname = $1;
@@ -236,27 +239,29 @@ sub sort_directory {
 		}
 		# move non-episodes
 		if($nonep eq "TRUE" && defined $nonepisodedir && $tvdir ne "KEEP_IN_SAME_DIRECTORIES") {
-			my $newname = $file;
-			$newname =~ s/\Q$sortdir\E//;
-			if($flattennonepisodefiles eq "FALSE") {
-				my $dirs = path($newname);
-				my $filename = filename($newname);
-				if(! -d $file && ! -e $nonepisodedir . $dirs) {
-					# recursively creates the dir structure
-					make_path($nonepisodedir . $dirs);
-				}
-				$newname = $dirs . $filename;
-			} else { # flatten
-				$newname = escape_myfilename($newname);
-			}
-			out("std", "MOVING NON-EPISODE: $file to $nonepisodedir$newname\n");
-			if(-d $file) {
-				dirmove($file, $nonepisodedir . $newname) or out("warn", "WARN: File $file cannot be copied to $nonepisodedir. : $!");
-			} else {
-				move($file, $nonepisodedir . $newname) or out("warn", "WARN: File $file cannot be copied to $nonepisodedir. : $!");
-			}
+			sort_other ("NON-EPISODE", "$nonepisodedir", $file);
 		}
 	}
+}
+
+# used to sort files into another directory
+sub sort_other {
+	my ($msg, $destdir, $file) = @_;
+	my $newname = $file;
+	$newname =~ s/\Q$sortdir\E//;
+	if($flattennonepisodefiles eq "FALSE") {
+		my $dirs = path($newname);
+		my $filename = filename($newname);
+		if(! -d $file && ! -e $destdir . $dirs) {
+			# recursively creates the dir structure
+			make_path($destdir . $dirs);
+		}
+		$newname = $dirs . $filename;
+	} else { # flatten
+		$newname = escape_myfilename($newname);
+	}
+
+	sort_file($file, $destdir . $newname, $msg);
 }
 
 sub process_args {
@@ -283,6 +288,16 @@ sub process_args {
 			$extractrar = $1;
 		} elsif($arg =~ /^--show-name-substitute:(.*-->.*)/ || $arg =~ /^-sub:(.*-->.*)/) {
 			push @showrenames, $1;
+		} elsif($arg =~ /^--sort-music-to:(.*)/ || $arg =~ /^-music:(.*)/) {
+			if(-e $1) {
+				$musicdir = $1;
+				# append a trailing / if it's not there
+				$musicdir .= '/' if($musicdir !~ /\/$/);
+			} else {
+				out("warn", "WARN: music directory does not exist ($1)\n");
+			}
+		} elsif($arg =~ /^--music-extension:(.*)/ || $arg =~ /^-me:(.*)/) {
+			push @musicext, $1;
 		} elsif($arg =~ /^--whitelist:(.*)/ || $arg =~ /^-white:(.*)/) {
 			my $glob = $1;
 			# puts the shell pattern in as a regex
@@ -451,8 +466,12 @@ OPTIONS:
 	This directory will contain the structure (Show)/(Seasons)/(episodes)
 	Alternatively set this to "KEEP_IN_SAME_DIRECTORIES" for a recursive renaming of files in directory-to-sort
 
+--sort-music-to:dir
+	Where to sort music into
+	If not specified, music is not moved
+
 --non-episode-dir:dir
-	Where to put things that are not episodes
+	Where to put things that are not episodes etc
 	If this is supplied then files and directories that SortTV does not believe are episodes will be moved here
 	If not specified, non-episodes are not moved
 
@@ -578,6 +597,10 @@ OPTIONS:
 --tvdb-id-substitute:NAME1-->TVDB ID
 	Substitutes names equal to NAME1 for TVDB ID for lookups
 	This argument can be repeated to add multiple rules for substitution
+
+--music-extension:extension
+	Define additional extensions for music files (SortTV knows a lot already)
+	This argument can be repeated to add multiple additional extensions
 
 --force-windows-compatible-filenames:[TRUE|FALSE]
 	Forces MSWindows compatible file names, even when run on other platforms such as Linux
@@ -787,6 +810,16 @@ sub glob2pat {
 		']' => ']',);
 	$globstr =~ s{(.)} { $patmap{$1} || "\Q$1" }ge;
 	return '^' . $globstr . '$';
+}
+
+sub ismusic {
+	my ($file) = @_;
+	foreach my $ext (@musicext) {
+		if($file =~ /.*\Q$ext\E$/) {
+			return "TRUE";
+		}
+	}
+	return "FALSE";
 }
 
 # checks white and black list
@@ -1161,46 +1194,11 @@ sub move_an_ep {
 	$newpath = $season;
 	$newpath .= '/' if($newpath !~ /\/$/);
 	$newpath .= $newfilename;
-	if(-e $newpath) {
-		if(filename($file) =~ /repack|proper/i) {
-			# still overwrites if copying, but doesn't output a message unless verbose
-			if($verbose eq "TRUE" || ($sortby ne "COPY" && $sortby ne "PLACE-SYMLINK")) {
-				out("warn", "OVERWRITE: Repack/proper version.\n");
-				out("std", "$sortby: sorting $file to ", $newpath, "\n");
-			} else {
-				$sendxbmcnotifications = "";
-			}
-		} elsif($ifexists eq "OVERWRITE") {
-			out("warn", "OVERWRITE: Existing file.\n");
-			out("std", "$sortby: sorting $file to ", $newpath, "\n");
-		} elsif($ifexists eq "SKIP") {
-			if($verbose eq "TRUE" || ($sortby ne "COPY" && $sortby ne "PLACE-SYMLINK")) {
-				out("warn", "SKIP: File $newpath already exists, skipping.\n");
-			}
-			return;
-		}
-	} else {
-		out("std", "$sortby: sorting $file to ", $newpath, "\n");
+	
+	unless($verbose eq "TRUE" || ($sortby ne "COPY" && $sortby ne "PLACE-SYMLINK")) {
+		$sendxbmcnotifications = "";
 	}
-	if($sortby eq "MOVE" || $sortby eq "MOVE-AND-LEAVE-SYMLINK-BEHIND") {
-		if(-d $file) {
-			dirmove($file, $newpath) or out("warn", "File $show cannot be moved to $season. : $!");
-		} else {
-			move($file, $newpath) or out("warn", "File $show cannot be moved to $season. : $!");
-		}
-	} elsif($sortby eq "COPY") {
-		if(-d $file) {
-			dircopy($file, $newpath) or out("warn", "File $show cannot be copied to $season. : $!");
-		} else {
-			copy($file, $newpath) or out("warn", "File $show cannot be copied to $season. : $!");
-		}
-	} elsif($sortby eq "PLACE-SYMLINK") {
-		symlink($file, $newpath) or out("warn", "File $file cannot be symlinked to $newpath. : $!");
-	}
-	# have moved now link
-	if($sortby eq "MOVE-AND-LEAVE-SYMLINK-BEHIND") {
-		symlink($newpath, $file) or out("warn", "File $newpath cannot be symlinked to $file. : $!");
-	}
+	sort_file($file, $newpath, "EPISODE");
 	# if the episode was moved (or already existed)
 	if(-e $newpath) {
 		if ($fetchimages ne "FALSE") {
@@ -1216,6 +1214,50 @@ sub move_an_ep {
 			$newshows .= "$new\n";
 		}
 	}
+}
+
+# moves, copies or symlinks the file to the destination
+sub sort_file {
+	my ($file, $newpath, $msg) = @_;
+	if(-e $newpath) {
+		if(filename($file) =~ /repack|proper/i) {
+			# still overwrites if copying, but doesn't output a message unless verbose
+			if($verbose eq "TRUE" || ($sortby ne "COPY" && $sortby ne "PLACE-SYMLINK")) {
+				out("warn", "OVERWRITE: Repack/proper version.\n");
+				out("std", "$sortby: sorting $file to ", $newpath, "\n");
+			} # elsewhere: else $sendxbmcnotifications = ""
+		} elsif($ifexists eq "OVERWRITE") {
+			out("warn", "OVERWRITE: Existing file.\n");
+			out("std", "$sortby: sorting $file to ", $newpath, "\n");
+		} elsif($ifexists eq "SKIP") {
+			if($verbose eq "TRUE" || ($sortby ne "COPY" && $sortby ne "PLACE-SYMLINK")) {
+				out("warn", "SKIP: File $newpath already exists, skipping.\n");
+			}
+			return;
+		}
+	} else {
+		out("std", "$sortby $msg: sorting $file to ", $newpath, "\n");
+	}
+	if($sortby eq "MOVE" || $sortby eq "MOVE-AND-LEAVE-SYMLINK-BEHIND") {
+		if(-d $file) {
+			dirmove($file, $newpath) or out("warn", "File $file cannot be moved to $newpath. : $!");
+		} else {
+			move($file, $newpath) or out("warn", "File $file cannot be moved to $newpath. : $!");
+		}
+	} elsif($sortby eq "COPY") {
+		if(-d $file) {
+			dircopy($file, $newpath) or out("warn", "File $file cannot be copied to $newpath. : $!");
+		} else {
+			copy($file, $newpath) or out("warn", "File $file cannot be copied to $newpath. : $!");
+		}
+	} elsif($sortby eq "PLACE-SYMLINK") {
+		symlink($file, $newpath) or out("warn", "File $file cannot be symlinked to $newpath. : $!");
+	}
+	# have moved now link
+	if($sortby eq "MOVE-AND-LEAVE-SYMLINK-BEHIND") {
+		symlink($newpath, $file) or out("warn", "File $newpath cannot be symlinked to $file. : $!");
+	}
+
 }
 
 sub move_a_season {
