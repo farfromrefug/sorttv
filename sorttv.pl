@@ -181,10 +181,11 @@ sub sort_directory {
 		|| $filename =~ /(.*)(?:\.|\s|-|_)+\[?0*(\d+)\s*[xX-]\s*0*(\d+).*/
 		|| $filename =~ /(.*)(?:\.|\s|-|_)+0*(\d)(\d{2})(?:\.|\s).*/
 		# "Show/Season 1/1.avi" or "Show Season 1/101.avi" or "Show/Season 1/1x1.avi" or "Show Series 1 Episode 1.avi" etc
-		|| $dirsandfile =~ /(.*?)(?:\.|\s|\/|\\|-|\1)*(?:Season|Series|\Q$seasontitle\E)\D?0*(\d+)(?:\.|\s|\/|\\|-|\1)+\[?0*\d+\s*[xX-]\s*0*(\d+).*/i
+		|| $dirsandfile =~ /(.*?)(?:\.|\s|\/|\\|-|\1)*(?:Season|Series|\Q$seasontitle\E)\D?0*(\d+)(?:\.|\s|\/|\\|-|\1)+\[?0*\d+?\s*[xX-]\s*0*(\d+).*/i
 		|| $dirsandfile =~ /(.*?)(?:\.|\s|\/|\\|-|\1)*(?:Season|Series|\Q$seasontitle\E)\D?0*(\d+)(?:\.|\s|\/|\\|-|\1)+\d?(?:[ .-]*Episode[ .-]*)?0*(\d{1,2}).*/i
 		|| ($matchtype eq "LIBERAL" && filename($file) =~ /(.*)(?:\.|\s|-|_)0*(\d+)\D*0*(\d+).*/)) {
 			$pureshowname = $1;
+			$pureshowname = fixpurename($pureshowname);
 			$showname = fixtitle($pureshowname);
 			if($seasondoubledigit eq "TRUE") {
 				$series = sprintf("%02d", $2);
@@ -670,6 +671,16 @@ sub fixtitle {
 	$title =~ s/(.*\/)(.*)/$2/;
 	$title = remdot($title);
 	$title =~ s/\d|\s|\(|\)//ig;
+	return $title;
+}
+
+# in most cases this is not needed, just cleans up the title slightly
+sub fixpurename {
+	my ($title) = @_;
+	$title =~ s/(?:Season.*|Series.*|\Q$seasontitle\E.*)//ig;
+	$title = remdot($title);
+	# replace any double spaces with one space
+	$title =~ s/\s\s/ /ig;
 	return $title;
 }
 
