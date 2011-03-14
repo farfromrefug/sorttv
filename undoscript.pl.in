@@ -1,0 +1,32 @@
+#!/usr/bin/perl
+
+use File::Copy::Recursive "dirmove", "dircopy", "rmove";
+use File::Copy;
+use File::Basename;
+
+
+sub out {
+    my ($type, @msg) = @_;
+    
+    if($type eq "verbose") {
+        print @msg;
+    } elsif($type eq "std") {
+        print @msg;
+    } elsif($type eq "warn") {
+        warn @msg;
+    }
+}
+
+sub user_asked_for_undo{
+    my (@msg) = @_;
+    print @msg;
+    print "\n";
+    my $answer = <>;        # Get the input, assign it to the variable 
+    chop $answer;
+    if    ( lc($answer) eq "y" ) 
+    {          
+        return 1; 
+    } 
+    return 0;
+}
+
