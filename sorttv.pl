@@ -56,7 +56,6 @@ my (@showrenames, @showtvdbids, @whitelist, @blacklist, @sizerange);
 my @musicext = ("aac","aif","iff","m3u","mid","midi","mp3","mpa","ra","ram","wave","wav","wma","ogg","oga","ogx","spx","flac","m4a", "pls");
 my $REDO_FILE = my $moveseasons = my $windowsnames = my $tvdbrename = my $lookupseasonep = my $extractrar = "TRUE";
 my $usedots = my $rename = my $verbose = my $seasondoubledigit = my $removesymlinks = my $needshowexist = my $flattennonepisodefiles = "FALSE";
-my $logfile = 0;
 my $seasontitle = "Season ";
 my $sortby = "MOVE";
 my $sortolderthandays = 0;
@@ -66,6 +65,7 @@ my $treatdir = "RECURSIVELY_SORT_CONTENTS";
 my $fetchimages = "NEW_SHOWS";
 my $imagesformat = "POSTER";
 my $scriptpath = dirname(rel2abs($0));
+my $logfile = "$scriptpath/sorttv.log";
 my $tvdblanguage = "en";
 my $tvdb;
 my $forceeptitle = ""; # HACK for limitation in TVDB API module
@@ -500,7 +500,7 @@ OPTIONS:
 
 --log-file:filepath
 	Log to this file
-	If not specified, output only goes to stdout (the screen)
+	If not specified, output goes to sorttv.log in the script directory
 
 --verbose:[TRUE|FALSE]
 	Output verbosity. Set to TRUE to show messages describing the decision making process.
