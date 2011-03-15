@@ -1236,7 +1236,7 @@ sub sort_file {
 			return;
 		}
 	} else {
-		out("std", "$sortby $msg: sorting $file to ", $newpath, "\n");
+		out("std", "$sortby $msg: sorting $file --to--> ", $newpath, "\n");
 	}
 	if($sortby eq "MOVE" || $sortby eq "MOVE-AND-LEAVE-SYMLINK-BEHIND") {
 		if(-d $file) {
