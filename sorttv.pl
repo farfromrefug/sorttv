@@ -34,7 +34,6 @@
 #  the Free Software Foundation, either version 3 of the License, or
 #  (at your option) any later version.
 
-
 use File::Copy::Recursive "dirmove", "dircopy";
 use File::Copy;
 use File::Glob ':glob';
@@ -43,17 +42,23 @@ use File::Spec::Functions "rel2abs";
 use File::Basename;
 use TVDB::API;
 use File::Find;
-use File::Path "make_path";
+use File::Path qw(make_path);
 use FileHandle;
 use warnings;
 use strict;
 use Fcntl ':flock';
+use Getopt::Long;
+use Getopt::Long qw(GetOptionsFromString);
+
+my $man = 0;
+my $help = 0;
 
 my ($sortdir, $tvdir, $nonepisodedir, $xbmcwebserver, $matchtype, $musicdir);
 my ($showname, $series, $episode, $pureshowname) = "";
 my ($newshows, $new, $log);
-my (@showrenames, @showtvdbids, @whitelist, @blacklist, @sizerange);
 my @musicext = ("aac","aif","iff","m3u","mid","midi","mp3","mpa","ra","ram","wave","wav","wma","ogg","oga","ogx","spx","flac","m4a", "pls");
+my ( @whitelist, @blacklist, @sizerange);
+my (%showrenames, %showtvdbids);
 my $REDO_FILE = my $moveseasons = my $windowsnames = my $tvdbrename = my $lookupseasonep = my $extractrar = "TRUE";
 my $usedots = my $rename = my $verbose = my $seasondoubledigit = my $removesymlinks = my $needshowexist = my $flattennonepisodefiles = "FALSE";
 my $seasontitle = "Season ";
@@ -77,12 +82,123 @@ if(open SELF, "< $0") {
 	flock SELF, LOCK_EX | LOCK_NB  or die "SortTV is already running, exiting.\n";
 }
 
+my @optionlist = ("non-episode-dir|ne=s"    => sub {
+                                                $nonepisodedir = $_[1];
+                                                if(-e $nonepisodedir) {
+                                                    
+                                                    # append a trailing / if it's not there
+                                                    $nonepisodedir .= '/' if($nonepisodedir !~ /\/$/);
+                                                } else {
+                                                    out("warn", "WARN: Non-episode directory does not exist ($nonepisodedir)\n");
+                                                }
+                                                if($^O =~ /MSWin/ && $fetchimages eq "TRUE") {
+                                                    out("warn", "WARN: The Windows version of the TVDB API module does not support image                            downloads.\nRECOMMENDATION: edit your config file to disable this feature.\n");
+                                                }},
+            "xbmc-web-server|xs=s"    => \$xbmcwebserver,
+            "match-type|ms=s" => \$matchtype,
+            "flatten-non-eps|fne=s" => \$flattennonepisodefiles,
+            "treat-directories|td=s" => \$treatdir,
+            "if-file-exists|e=s" => \$ifexists,
+            "extract-compressed-before-sorting|rar=s" => \$extractrar,
+            "show-name-substitute|fne=s" => sub { 
+                                                        if($_[1] =~ /(.*)-->(.*)/) {
+                                                            $showrenames{$1} = $2;
+                                                        }},
+            "whitelist|white=s" => sub { # puts the shell pattern in as a regex
+                                                    push @whitelist, glob2pat($_[1]); },
+            "blacklist|black=s" => sub { # puts the shell pattern in as a regex
+                                                    push @blacklist, glob2pat($_[1]); },
+            "tvdb-id-substitute|tis=s" => sub { 
+                                                        if($_[1] =~ /(.*)-->(.*)/) {
+                                                            $showtvdbids{$1} = $2;
+                                                        }},
+            "log-file|o=s" => \$logfile,
+            "fetch-show-title|fst=s" => \$tvdbrename,
+            "rename-episodes|rn=s" => \$rename,
+            "lookup-language|lang=s" => \$tvdblanguage,
+            "fetch-images|fi=s" => \$fetchimages,
+            "images-format|im=s" => \$imagesformat,
+            "require-show-directories-already-exist|rs=s" => \$needshowexist,
+            "force-windows-compatible-filenames|fw=s" => \$windowsnames,
+            "rename-format|rf=s" => \$renameformat,
+            "remove-symlinks|rs=s" => \$removesymlinks,
+            "use-dots-instead-of-spaces|dots=s" => \$usedots,
+            "sort-by|by=s" => \$sortby,
+            "sort-only-older-than-days|age=i" => \$sortolderthandays,
+            "season-double-digits|sd=s" => \$seasondoubledigit,
+            "match-files-based-on-tvdb-lookups|tlookup=s" => \$lookupseasonep,
+            "season-title|st=s" => \$seasontitle,
+            "verbose|v" => \$verbose,
+            "filesize-range|fsrange=f{2}" => sub {
+                                                    # Extract the min & max values, can mix and match postfixes
+                                                    my $minfilesize = $_[1];
+                                                    my $maxfilesize = $_[2];
+                                                    $minfilesize =~ s/MB//;
+                                                    $maxfilesize =~ s/MB//;
+                                                    # Fix filesizes passed in to all MB
+                                                    if ($minfilesize =~ /(.*)GB/) {
+                                                        $minfilesize = $1 * 1024;
+                                                    }
+                                                    if ($maxfilesize =~ /(.*)GB/) {
+                                                        $maxfilesize = $1 * 1024;
+                                                    }
+                                                    # Save as MB range
+                                                    push @sizerange, "$minfilesize-$maxfilesize";} ,
+            "no-network|nn" => sub {
+                                                  $xbmcwebserver = "";
+                                                    $tvdbrename = $fetchimages = $lookupseasonep = "FALSE";
+                                                    $renameformat =~ s/\[EP_NAME\d\]//;},
+            "read-config-file|conf=s" => sub { get_config_from_file($_[1]); },
+            "directory-to-sort|sort=s" => sub { my $sortd = $_[1];
+                                                # use Unix slashes
+                                                $sortd =~ s/\\/\//g;
+                                                if(-e $sortd) {
+                                                    $sortdir = $sortd;
+                                                    # append a trailing / if it's not there
+                                                    $sortdir .= '/' if($sortdir !~ /\/$/);
+                                                } else {
+                                                    out("warn", "WARN: Directory to sort does not exist ($1)\n");
+                                                }},
+            "directory-to-sort-into|sortto=s" => sub { my $sortt = $_[1];
+                                                        # use Unix slashes
+                                                        $sortt =~ s/\\/\//g;
+                                                        if($sortt eq "KEEP_IN_SAME_DIRECTORIES") {
+                                                            $nonepisodedir = "";
+                                                            $tvdir = "KEEP_IN_SAME_DIRECTORIES";
+                                                        } elsif(-e $sortt) {
+                                                            $tvdir = $sortt;
+                                                            # append a trailing / if it's not there
+                                                            $tvdir .= '/' if($tvdir !~ /\/$/);
+                                                        } else {
+                                                            out("warn", "WARN: Directory to sort into does not exist ($1)\n");
+                                                        }},
+			"sort-music-to|music=s" => sub { 	if(-e $_[1]) {
+													$musicdir = $_[1];
+													# append a trailing / if it's not there
+													$musicdir .= '/' if($musicdir !~ /\/$/);
+												} else {
+													out("warn", "WARN: music directory does not exist ($_[1])\n");
+												}},
+			"music-extension|me=s" => \@musicext,
+            "h|help|?" => \$help, man => \$man);
+            
+
+
 get_config_from_file("$scriptpath/sorttv.conf");
-process_args(@ARGV);
+
+#we declare all the possible options through command line
+#each option can have multiple variables (|) and can be used like
+# "-opt" or "-opt=value" or "opt=value" or "opt value" or "-opt value"
+GetOptions(@optionlist);
+
+
+#we stop the script and show the help if help or man option was used
+showhelp(1) if $help or $man;
+
 if(!defined($sortdir) || !defined($tvdir)) {
-	out("warn", "Incorrect usage or configuration (missing sort or sort-to directories)\n");
-	out("warn", "run 'perl sorttv.pl --help' for more information about how to use SortTV");
-	exit;
+    out("warn", "Incorrect usage or configuration (missing sort or sort-to directories)\n");
+    out("warn", "run 'perl sorttv.pl --help' for more information about how to use SortTV");
+    exit;
 }
 
 # if uses thetvdb, set it up
@@ -264,167 +380,6 @@ sub sort_other {
 	sort_file($file, $destdir . $newname, $msg);
 }
 
-sub process_args {
-	foreach my $arg (@_) {
-		if($arg =~ /^--non-episode-dir:(.*)/ || $arg =~ /^-ne:(.*)/) {
-			if(-e $1) {
-				$nonepisodedir = $1;
-				# append a trailing / if it's not there
-				$nonepisodedir .= '/' if($nonepisodedir !~ /\/$/);
-			} else {
-				out("warn", "WARN: Non-episode directory does not exist ($1)\n");
-			}
-		} elsif($arg =~ /^--xbmc-web-server:(.*)/ || $arg =~ /^-xs:(.*)/) {
-			$xbmcwebserver = $1;
-		} elsif($arg =~ /^--match-type:(.*)/ || $arg =~ /^-mt:(.*)/) {
-			$matchtype = $1;
-		} elsif($arg =~ /^--flatten-non-eps:(.*)/ || $arg =~ /^-fne:(.*)/) {
-			$matchtype = $1;
-		} elsif($arg =~ /^--treat-directories:(.*)/ || $arg =~ /^-td:(.*)/) {
-			$treatdir = $1;
-		} elsif($arg =~ /^--if-file-exists:(.*)/ || $arg =~ /^-e:(.*)/) {
-			$ifexists = $1;
-		} elsif($arg =~ /^--extract-compressed-before-sorting:(.*)/ || $arg =~ /^-rar:(.*)/) {
-			$extractrar = $1;
-		} elsif($arg =~ /^--show-name-substitute:(.*-->.*)/ || $arg =~ /^-sub:(.*-->.*)/) {
-			push @showrenames, $1;
-		} elsif($arg =~ /^--sort-music-to:(.*)/ || $arg =~ /^-music:(.*)/) {
-			if(-e $1) {
-				$musicdir = $1;
-				# append a trailing / if it's not there
-				$musicdir .= '/' if($musicdir !~ /\/$/);
-			} else {
-				out("warn", "WARN: music directory does not exist ($1)\n");
-			}
-		} elsif($arg =~ /^--music-extension:(.*)/ || $arg =~ /^-me:(.*)/) {
-			push @musicext, $1;
-		} elsif($arg =~ /^--whitelist:(.*)/ || $arg =~ /^-white:(.*)/) {
-			my $glob = $1;
-			# puts the shell pattern in as a regex
-			push @whitelist, glob2pat($glob);
-		} elsif($arg =~ /^--blacklist:(.*)/ || $arg =~ /^-black:(.*)/) {
-			my $glob = $1;
-			# puts the shell pattern in as a regex
-			push @blacklist, glob2pat($glob);
-		} elsif($arg =~ /^--tvdb-id-substitute:(.*-->.*)/ || $arg =~ /^-tis:(.*-->.*)/) {
-			push @showtvdbids, $1;
-		} elsif($arg =~ /^--log-file:(.*)/ || $arg =~ /^-o:(.*)/) {
-			$logfile = $1;
-		} elsif($arg =~ /^--fetch-show-title:(.*)/ || $arg =~ /^-fst:(.*)/) {
-			$tvdbrename = $1;
-		} elsif($arg =~ /^--rename-episodes:(.*)/ || $arg =~ /^-rn:(.*)/) {
-			$rename = $1;
-		} elsif($arg =~ /^--lookup-language:(.*)/ || $arg =~ /^-lang:(.*)/) {
-			$tvdblanguage = $1;
-		} elsif($arg =~ /^--fetch-images:(.*)/ || $arg =~ /^-fi:(.*)/) {
-			$fetchimages = $1;
-			if($^O =~ /MSWin/ && $fetchimages eq "TRUE") {
-				out("warn", "WARN: The Windows version of the TVDB API module does not support image downloads.\nRECOMMENDATION: edit your config file to disable this feature.\n");
-			}
-		} elsif($arg =~ /^--images-format:(.*)/ || $arg =~ /^-if:(.*)/) {
-			$imagesformat = $1;
-		} elsif($arg =~ /^--require-show-directories-already-exist:(.*)/ || $arg =~ /^-rs:(.*)/) {
-			$needshowexist = $1;
-		} elsif($arg =~ /^--force-windows-compatible-filenames:(.*)/ || $arg =~ /^-fw:(.*)/) {
-			$windowsnames = $1;
-		} elsif($arg =~ /^--rename-format:(.*)/ || $arg =~ /^-rf:(.*)/) {
-			$renameformat = $1;
-		} elsif($arg =~ /^--remove-symlinks:(.*)/ || $arg =~ /^-rs:(.*)/) {
-			$removesymlinks = $1;
-		} elsif($arg =~ /^--use-dots-instead-of-spaces:(.*)/ || $arg =~ /^-dots:(.*)/) {
-			$usedots = $1;
-		} elsif($arg =~ /^--season-title:(.*)/ || $arg =~ /^-st:(.*)/) {
-			$seasontitle = $1;
-		} elsif($arg =~ /^--sort-by:(.*)/ || $arg =~ /^-by:(.*)/) {
-			$sortby = $1;
-		} elsif($arg =~ /^--sort-only-older-than-days:(\d+)/ || $arg =~ /^-age:(\d+)/) {
-			$sortolderthandays = $1;
-		} elsif($arg =~ /^--season-double-digits:(.*)/ || $arg =~ /^-sd:(.*)/) {
-			$seasondoubledigit = $1;
-		} elsif($arg =~ /^--match-files-based-on-tvdb-lookups:(.*)/ || $arg =~ /^-tlookup:(.*)/) {
-			$lookupseasonep = $1;
-		} elsif($arg =~ /^--verbose:(.*)/ || $arg =~ /^-v:(.*)/) {
-			$verbose = $1;
-		} elsif($arg =~ /^--filesize-range:(.*)-(.*)/ || $arg =~ /^-fsrange:(.*)-(.*)/) {
-			# Extract the min & max values, can mix and match postfixes
-			my $minfilesize = $1;
-			my $maxfilesize = $2;
-			$minfilesize =~ s/MB//;
-			$maxfilesize =~ s/MB//;
-			# Fix filesizes passed in to all MB
-			if ($minfilesize =~ /(.*)GB/) {
-				$minfilesize = $1 * 1024;
-			}
-			if ($maxfilesize =~ /(.*)GB/) {
-				$maxfilesize = $1 * 1024;
-			}
-			# Save as MB range
-			push @sizerange, "$minfilesize-$maxfilesize";
-		} elsif($arg =~ /^--no-network/ || $arg =~ /^-no-net/) {
-			$xbmcwebserver = "";
-			$tvdbrename = $fetchimages = $lookupseasonep = "FALSE";
-			$renameformat =~ s/\[EP_NAME\d\]//;
-		} elsif($arg =~ /^--read-config-file:(.*)/ || $arg =~ /^-conf:(.*)/) {
-			get_config_from_file($1);
-		} elsif($arg =~ /^--directory-to-sort:(.*)/ || $arg =~ /^-sort:(.*)/) {
-			my $sortd = $1;
-			# use Unix slashes
-			$sortd =~ s/\\/\//g;
-			if(-e $sortd) {
-				$sortdir = $sortd;
-				# append a trailing / if it's not there
-				$sortdir .= '/' if($sortdir !~ /\/$/);
-			} else {
-				out("warn", "WARN: Directory to sort does not exist ($1)\n");
-			}
-		} elsif($arg =~ /^--directory-to-sort-into:(.*)/ || $arg =~ /^-sortto:(.*)/) {
-			my $sortt = $1;
-			# use Unix slashes
-			$sortt =~ s/\\/\//g;
-			if($sortt eq "KEEP_IN_SAME_DIRECTORIES") {
-				$nonepisodedir = "";
-				$tvdir = "KEEP_IN_SAME_DIRECTORIES";
-			} elsif(-e $sortt) {
-				$tvdir = $sortt;
-				# append a trailing / if it's not there
-				$tvdir .= '/' if($tvdir !~ /\/$/);
-			} else {
-				out("warn", "WARN: Directory to sort into does not exist ($1)\n");
-			}
-		} elsif($arg eq "--help" || $arg eq "-h") {
-			showhelp();
-		} elsif(!defined($sortdir)) {
-			my $sortd = $arg;
-			# use Unix slashes
-			$sortd =~ s/\\/\//g;
-			if(-e $sortd) {
-				$sortdir = $sortd;
-				# append a trailing / if it's not there
-				$sortdir .= '/' if($sortdir !~ /\/$/);
-			} else {
-				out("warn", "WARN: Directory to sort does not exist ($arg)\n");
-			}
-		} elsif(!defined($tvdir)) {
-			my $sortt = $arg;
-			# use Unix slashes
-			$sortt =~ s/\\/\//g;
-			if($sortt eq "KEEP_IN_SAME_DIRECTORIES") {
-				$nonepisodedir = "";
-				$tvdir = "KEEP_IN_SAME_DIRECTORIES";
-			} elsif(-e $sortt) {
-				$tvdir = $sortt;
-				# append a trailing / if it's not there
-				$tvdir .= '/' if($tvdir !~ /\/$/);
-			} else {
-				out("warn", "Directory to sort into does not exist ($arg)\n");
-			}
-		} else {
-			out("warn", "WARN: Incorrect usage (invalid option): $arg\n");
-			out("warn", "INFO: run 'perl sorttv.pl --help' for more information about how to use SortTV");
-		}
-	}
-}
-
 sub get_config_from_file {
 	my ($filename) = @_;
 	my @arraytoconvert;
@@ -433,12 +388,14 @@ sub get_config_from_file {
 		out("verbose", "INFO: Reading configuration settings from '$filename'\n");
 		while(my $in = <IN>) {
 			chomp($in);
+			$in =~ s/\\/\//g;
 			if($in =~ /^\s*#/ || $in =~ /^\s*$/) {
 				# ignores comments and whitespace
-			} elsif($in =~ /(.+):(.+)/) {
-				process_args("--$1:$2");
+			} elsif($in =~ /([^:]+?):(.+)/) {
+			    
+				GetOptionsFromString("--$1=\"$2\"", @optionlist);
 			} else {
-				out("warn", "WARN: this line does not match expected format: '$in'\n");
+				GetOptionsFromString("--$in", @optionlist);
 			}
 		}
 		close (IN);
@@ -723,14 +680,11 @@ sub fixdate {
 # substitutes show names as configured
 sub substitute_name {
 	my ($from) = @_;
-	foreach my $substitute (@showrenames) {
-		if($substitute =~ /(.*)-->(.*)/) {
-			my $subdest = $2, my $subsrc = fixtitle($1);
-			if(fixtitle($from) =~ /^\Q$subsrc\E$/i) {
-				return $subdest;
-			}
-		}
-	}
+	foreach my $substitute (keys %showrenames){
+        if(fixtitle($from) =~ /^\Q$substitute\E$/i) {
+                return $showrenames{$substitute};
+        }
+    }
 	# if no matches, returns unchanged
 	return $from;
 }
@@ -747,15 +701,12 @@ sub resolve_show_name {
 # Use tvdb IDs to lookup shows
 # returns the ID if available, or an empty string
 sub substitute_tvdb_id {
-	my ($from) = @_;
-	foreach my $substitute (@showtvdbids) {
-		if($substitute =~ /(.*)-->(.*)/) {
-			my $subdest = $2, my $subsrc = fixtitle($1);
-			if(fixtitle($from) =~ /^\Q$subsrc\E$/i) {
-				return $subdest;
-			}
-		}
-	}
+	my ($from) = @_;	
+	foreach my $substitute (keys %showtvdbids){
+        if(fixtitle($from) =~ /^\Q$substitute\E$/i) {
+                return $showtvdbids{$substitute};
+        }
+    }
 	# if no matches, returns unchanged
 	return $from;
 }
